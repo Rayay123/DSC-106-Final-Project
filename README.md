@@ -1,8 +1,6 @@
 # DSC 106 Final Project
 
-## Working title
-
-**Two Climate Futures: Where High Emissions Add the Most Heat**
+## Two Climate Futures: Mapping the Warming Gap by 2100
 
 ## Team
 
