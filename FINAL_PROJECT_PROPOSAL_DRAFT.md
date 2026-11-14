@@ -1,8 +1,7 @@
-# Final Project Proposal Draft
+# Final Project Proposal
 
-## Working title
+## Project Title: Two Climate Futures: Mapping the Warming Gap by 2100
 
-**Two Climate Futures: Where High Emissions Add the Most Heat**
 
 ## Team members
 
