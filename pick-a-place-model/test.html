@@ -23,25 +23,52 @@
       <div class="panel-head">
         <div>
           <h2>Where is the gap largest?</h2>
-          <p class="note">Color shows how much warmer SSP5-8.5 is than SSP1-2.6 by 2091–2100.</p>
+          <p class="note">Color shows how much warmer SSP5-8.5 is than SSP1-2.6 by 2091–2100.
+            Scroll over the map, or drag a box, to zoom in. Once zoomed, drag to move around
+            (Shift+drag to box-zoom further); press Esc to zoom out.</p>
         </div>
         <label class="picker">
           <span>Jump to</span>
           <select id="preset"></select>
         </label>
       </div>
-      <div id="map" class="figure"></div>
-      <div id="map-legend"></div>
-    </section>
+      <div class="map-wrap">
+        <div id="map" class="figure"></div>
+        <button type="button" id="zoom-reset" class="zoom-reset" hidden>Reset zoom (Esc)</button>
 
-    <section class="panel">
-      <p id="readout" class="readout" aria-live="polite"></p>
-      <div id="chart" class="figure"></div>
-      <div id="chart-legend" class="chart-legend"></div>
-      <label class="fit-toggle">
-        <input type="checkbox" id="fit-y" />
-        Zoom the y-axis to this place (off = same scale for every place, for fair comparison)
-      </label>
+        <!-- Line chart card: docked in the map's corner, minimized to its title bar,
+             or expanded to cover the whole map. State is set by main.js. -->
+        <aside id="chart-card" class="chart-card is-docked" aria-label="Warming over time at the selected place">
+          <div class="chart-card-head">
+            <div id="chart-title" class="chart-card-title" aria-live="polite"></div>
+            <div class="chart-card-buttons">
+              <button type="button" id="chart-min" class="icon-btn"></button>
+              <button type="button" id="chart-max" class="icon-btn"></button>
+            </div>
+          </div>
+          <div class="chart-card-body">
+            <p id="readout-short" class="readout-short"></p>
+            <p id="readout" class="readout"></p>
+            <div id="chart"></div>
+            <div id="chart-legend" class="chart-legend"></div>
+          </div>
+          <!-- Drag to resize the docked card -->
+          <div id="chart-resize" class="chart-card-resize" title="Drag to resize" aria-hidden="true"></div>
+        </aside>
+      </div>
+      <div id="map-legend"></div>
+      <div class="map-toggles">
+        <label class="fit-toggle">
+          <input type="checkbox" id="show-alerts" checked />
+          Show alert markers (largest gap in Antarctica, Australia, Saudi Arabia, NW Africa,
+          South Africa and the Canadian Arctic;
+          lowest in the Atlantic)
+        </label>
+        <label class="fit-toggle">
+          <input type="checkbox" id="show-oceans" checked />
+          Show ocean names
+        </label>
+      </div>
     </section>
 
     <p class="caveat">

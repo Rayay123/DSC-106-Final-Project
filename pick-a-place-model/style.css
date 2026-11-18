@@ -122,11 +122,31 @@ main {
 }
 
 /* ---------- Map ---------- */
-#map svg { cursor: crosshair; }
+.map-wrap { position: relative; }
+
+#map svg {
+  cursor: crosshair;
+  user-select: none;
+  touch-action: none; /* lets touch drags draw a zoom box instead of scrolling */
+  outline: none;      /* focused by script for the Esc shortcut; no focus ring needed */
+}
+
+/* Strokes keep the same on-screen width at every zoom level */
+.sphere, .country, .selected-cell, .selected-dot {
+  vector-effect: non-scaling-stroke;
+}
 
 .sphere {
   fill: #f1f3f5;
   stroke: #c9ced4;
+}
+
+/* The heatmap is one small image (a block per square), stretched over the map.
+   Keep its square edges sharp instead of blurring them when zoomed in. */
+.heatmap {
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+  pointer-events: none;
 }
 
 .country {
@@ -136,6 +156,13 @@ main {
   stroke-width: 0.6;
   pointer-events: none;
 }
+
+#map svg.is-zoomed .country { stroke-width: 1; }
+
+/* When zoomed in, dragging moves the map */
+#map svg.is-zoomed { cursor: grab; }
+#map svg.is-panning,
+#map svg.is-panning * { cursor: grabbing; }
 
 .selected-cell {
   fill: none;
@@ -151,22 +178,267 @@ main {
   pointer-events: none;
 }
 
+/* Ocean names: quiet italic text with a soft halo so it reads over any heatmap color */
+.ocean-label {
+  fill: #2f4a5e;
+  font-family: var(--serif);
+  font-size: 11.5px;
+  font-style: italic;
+  letter-spacing: 0.06em;
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.75);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Alert marker pointing at Antarctica's largest gap */
+.alert-marker { cursor: pointer; }
+
+.alert-leader {
+  fill: none;
+  stroke: #1c2128;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.alert-badge {
+  fill: #f5b700;
+  stroke: #1c2128;
+  stroke-width: 1.75;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.35));
+}
+
+.alert-bang {
+  fill: #1c2128;
+  font-family: var(--sans);
+  font-size: 17px;
+  font-weight: 800;
+  pointer-events: none;
+}
+
+.alert-label {
+  fill: #1c2128;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: #fff;
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
+.alert-marker:hover .alert-badge { fill: #ffcb2e; }
+
+/* Marker for a lowest-gap spot: blue, to match the cool end of the color scale */
+.alert-marker.is-lowest .alert-badge { fill: #8cc0e8; }
+.alert-marker.is-lowest:hover .alert-badge { fill: #a9d2f0; }
+
+.zoom-brush {
+  fill: rgba(28, 33, 40, 0.08);
+  stroke: #1c2128;
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+  pointer-events: none;
+}
+
+.zoom-reset {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font: inherit;
+  font-size: 0.82rem;
+  color: var(--text);
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+}
+
+.zoom-reset:hover { background: #fff; border-color: #c9ced4; }
+
 #map-legend {
   display: flex;
   justify-content: center;
   margin-top: 0.5rem;
 }
 
-/* ---------- Chart ---------- */
-.readout {
-  margin: 0 0 0.75rem;
-  font-size: 1.05rem;
+/* ---------- Chart card (over the map) ---------- */
+/* Docked: a small card in the map's bottom-left corner (mostly South Pacific). */
+.chart-card {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 4;
+  width: min(340px, calc(100% - 20px));
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);  /* solid, so map labels don't show through the chart */
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
 }
 
-.readout .place-title { font-family: var(--serif); font-size: 1.2rem; }
-.readout .place-meta { color: var(--muted); font-size: 0.9rem; }
+.chart-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.35rem 0.3rem 0.65rem;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Drag the title bar to move the card */
+.chart-card-head { user-select: none; touch-action: none; }
+.chart-card.is-docked .chart-card-head,
+.chart-card.is-minimized .chart-card-head { cursor: grab; }
+.chart-card.is-dragging,
+.chart-card.is-dragging .chart-card-head { cursor: grabbing; }
+.chart-card.is-dragging { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18); }
+
+/* Corner grip to resize the docked card */
+.chart-card-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  touch-action: none;
+  /* two short diagonal lines */
+  background:
+    linear-gradient(135deg, transparent 0 52%, #aab1b9 52% 60%, transparent 60% 70%,
+      #aab1b9 70% 78%, transparent 78%);
+}
+.chart-card:not(.is-docked) .chart-card-resize { display: none; }
+
+.chart-card-title {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+.chart-card-title .place-title { font-family: var(--serif); font-size: 0.95rem; }
+.chart-card-title .place-meta { color: var(--muted); }
+
+.chart-card-buttons { display: flex; gap: 2px; flex-shrink: 0; }
+
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.icon-btn:hover { background: #f0eee9; color: var(--text); }
+.icon-btn:focus-visible { outline: 2px solid var(--cool); outline-offset: 1px; }
+.icon-btn svg {
+  pointer-events: none;  /* clicks always land on the button, not the (swappable) icon */
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.chart-card-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  padding: 0.35rem 0.6rem 0.45rem;
+}
+
+#chart { height: 165px; }
+#chart svg { display: block; }
+
+.readout-short {
+  margin: 0 0 0.15rem;
+  font-size: 0.8rem;
+  color: var(--text);
+}
+.readout-short .readout-global { color: var(--muted); }
+
+/* The full sentence and legend only fit when expanded. */
+.chart-card .readout,
+.chart-card .chart-legend { display: none; }
+
+/* Minimized: just the title bar. Clicking it brings the chart back. */
+.chart-card.is-minimized { width: auto; max-width: min(340px, calc(100% - 20px)); }
+.chart-card.is-minimized .chart-card-body { display: none; }
+.chart-card.is-minimized .chart-card-head { border-bottom: 0; cursor: pointer; }
+
+/* Expanded: covers the whole map. */
+.chart-card.is-maximized {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: auto;
+  z-index: 10;  /* above the Reset zoom button */
+  border-radius: 0;
+  background: var(--surface);
+  box-shadow: none;
+}
+.chart-card.is-maximized .chart-card-head { padding: 0.45rem 0.5rem 0.45rem 1rem; }
+.chart-card.is-maximized .chart-card-title { font-size: 0.9rem; }
+.chart-card.is-maximized .chart-card-title .place-title { font-size: 1.15rem; }
+.chart-card.is-maximized .chart-card-body { padding: 0.6rem 1rem 0.6rem; }
+.chart-card.is-maximized .readout-short { display: none; }
+.chart-card.is-maximized .readout { display: block; }
+.chart-card.is-maximized .chart-legend { display: flex; }
+.chart-card.is-maximized #chart { flex: 1; height: auto; min-height: 0; }
+
+.readout {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+}
+
+/* Small screens: the map is too short to hold a card, so the card sits below the map,
+   and "expand" fills the whole screen instead. */
+@media (max-width: 640px) {
+  .chart-card,
+  .chart-card.is-minimized {
+    position: static;
+    width: auto;
+    max-width: none;
+    margin-top: 0.75rem;
+    box-shadow: none;
+  }
+  .chart-card.is-maximized {
+    position: fixed;
+    z-index: 50;
+    margin: 0;
+  }
+  /* Below the map there's nothing to move or resize over */
+  .chart-card-resize { display: none; }
+  .chart-card.is-docked .chart-card-head { cursor: auto; }
+  .chart-card-head { touch-action: auto; }
+}
 
 .axis text { fill: var(--muted); font-size: 12px; }
+.axis-title { fill: var(--muted); font-size: 12px; }
+/* Smaller chart text in the docked card */
+svg.is-compact .axis text,
+svg.is-compact .axis-title { font-size: 10px; }
+svg.is-compact .end-label { font-size: 10.5px; }
+svg.is-compact .series { stroke-width: 2; }
 .axis line, .axis path { stroke: #c9ced4; }
 .grid line { stroke: #eceae4; }
 .zero-line { stroke: #9aa4ae; }
@@ -220,6 +492,14 @@ main {
   margin-top: 0.6rem;
   font-size: 0.85rem;
   color: var(--muted);
+}
+
+/* Map display options, side by side (wrapping on narrow screens) */
+.map-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  column-gap: 1.5rem;
 }
 
 .caveat {
