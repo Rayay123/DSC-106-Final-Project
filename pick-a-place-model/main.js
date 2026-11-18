@@ -971,7 +971,8 @@ const mapWrap = document.querySelector(".map-wrap");
 let chartState = "docked";  // "docked" | "minimized" | "maximized"
 
 // Where the reader has moved/resized the card to, in px inside the map:
-// { left, top, width?, chartH? }. null = the default corner position and size from the CSS.
+// { left, bottom, width?, chartH? } (bottom = gap between the card's and the map's bottom
+// edges). null = the default corner position and size from the CSS.
 // Only applied while docked or minimized; an expanded card always covers the whole map.
 let cardGeom = null;
 const CARD_PAD = 6;       // keep this far inside the map's edges
@@ -995,22 +996,25 @@ function applyCardGeometry() {
   const docked = chartState === "docked";
   card.style.width = docked && cardGeom.width ? `${cardGeom.width}px` : "";
   chartBox.style.height = docked && cardGeom.chartH ? `${cardGeom.chartH}px` : "";
-  card.style.bottom = "auto";
+  // Anchored by its BOTTOM edge, so minimizing collapses the card down into its
+  // bottom-left corner (like the default corner position) rather than up to its top.
+  card.style.top = "auto";
 
   // Clamp only what's displayed; cardGeom keeps the reader's choice, so e.g. a minimized bar
   // nudged in from the edge doesn't shift the full card when it's restored.
   const wrap = mapWrap.getBoundingClientRect();
   const { width, height } = card.getBoundingClientRect();
   card.style.left = `${clamp(cardGeom.left, CARD_PAD, wrap.width - width - CARD_PAD)}px`;
-  card.style.top = `${clamp(cardGeom.top, CARD_PAD, wrap.height - height - CARD_PAD)}px`;
+  card.style.bottom = `${clamp(cardGeom.bottom, CARD_PAD, wrap.height - height - CARD_PAD)}px`;
 }
 
 // At the start of a move/resize, record where the card actually is on screen
 // (the CSS default the first time; afterwards its clamped, displayed position).
+// `bottom` is the distance from the map's bottom edge to the card's bottom edge.
 function ensureCardGeom() {
   const wrap = mapWrap.getBoundingClientRect();
   const r = chartCard.node().getBoundingClientRect();
-  cardGeom = { ...cardGeom, left: r.left - wrap.left, top: r.top - wrap.top };
+  cardGeom = { ...cardGeom, left: r.left - wrap.left, bottom: wrap.bottom - r.bottom };
   if (chartState === "docked") {
     cardGeom.width = r.width;
     cardGeom.chartH = chartBox.getBoundingClientRect().height;
@@ -1042,21 +1046,27 @@ const moveCardDrag = rafThrottle(event => {
   chartCard.classed("is-dragging", true);
   hideTooltip();
   const { start } = cardDrag;
+  const card = chartCard.node();
   if (cardDrag.mode === "move") {
     cardGeom.left = start.left + dx;
-    cardGeom.top = start.top + dy;
+    cardGeom.bottom = start.bottom - dy;
+    applyCardGeometry();
   } else {
     // Resize from the bottom-right corner; the top-left corner stays put.
     const wrap = mapWrap.getBoundingClientRect();
+    const top = wrap.height - start.bottom - cardDrag.cardH;  // card's top edge, held fixed
     const chrome = cardDrag.cardH - start.chartH;  // title bar, summary line, padding
     cardGeom.width = clamp(start.width + dx, CARD_MIN_W, wrap.width - start.left - CARD_PAD);
-    cardGeom.chartH = clamp(start.chartH + dy, CARD_MIN_CHART_H, wrap.height - start.top - chrome - CARD_PAD);
+    cardGeom.chartH = clamp(start.chartH + dy, CARD_MIN_CHART_H, wrap.height - top - chrome - CARD_PAD);
+    applyCardGeometry();
+    // The card is anchored by its bottom, so move the bottom to keep the top in place.
+    // (Measured, because the summary line can wrap differently at the new width.)
+    cardGeom.bottom = wrap.height - top - card.getBoundingClientRect().height;
+    applyCardGeometry();
   }
-  applyCardGeometry();
   // Store where the card actually ended up (inside the map), not where the pointer went.
-  const card = chartCard.node();
   cardGeom.left = parseFloat(card.style.left);
-  cardGeom.top = parseFloat(card.style.top);
+  cardGeom.bottom = parseFloat(card.style.bottom);
 });
 
 function endCardDrag() {
