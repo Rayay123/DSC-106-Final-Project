@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Two Climate Futures: Mapping the Warming Gap by 2100</title>
+  <link rel="icon" href="data:," />
   <link rel="stylesheet" href="style.css" />
   <script type="module" src="main.js"></script>
 </head>
@@ -19,7 +20,7 @@
   </header>
 
   <main>
-    <section class="section">
+    <section class="section narrow">
       <h2>The question</h2>
       <p class="lead">
         How much more warming does a high-emissions future produce than a
@@ -27,9 +28,65 @@
       </p>
     </section>
 
-
     <section class="section">
-      <h2>Visualization Here:</h2>
+      <div class="narrow section-intro">
+        <h2>Pick a place</h2>
+        <p>
+          The map compares the projected warming gap near the end of the century.
+          Choose one of the locations or click a map square to see how the three
+          emissions scenarios change over time.
+        </p>
+      </div>
+
+      <iframe
+        id="prototype-frame"
+        class="prototype-frame"
+        src="pick-a-place-model/test.html"
+        title="Interactive map and chart comparing projected warming scenarios"
+      ></iframe>
+    </section>
+
+    <section class="section narrow takeaway">
+      <h2>What stands out</h2>
+      <p>
+        The scenarios do not separate evenly everywhere. By the end of the century,
+        the gap between low and high emissions is especially large in some polar
+        regions, while places closer to the equator generally show a smaller gap.
+      </p>
+    </section>
+
+    <section class="section narrow writeup">
+      <h2>Prototype progress</h2>
+
+      <h3>What have we done so far?</h3>
+      <p>
+        We started by narrowing the project to one question about how the warming gap
+        changes across locations. We prepared a smaller browser-ready version of the
+        CMIP6 temperature data for the low, middle, and high emissions scenarios. We
+        built a clickable world map that updates a line chart when the reader chooses
+        a location. We also added direct values, a color legend, preset locations, and
+        an optional y-axis adjustment so the different places are easier to explore.
+      </p>
+
+      <h3>What will be the most challenging part to design, and why?</h3>
+      <p>
+        The hardest part will be showing local differences without making the data
+        look more precise than it is. Each map square covers a large area, so a square
+        near a coast can include both land and ocean. We also need to keep the chart
+        scales fair across locations while still letting readers notice smaller local
+        changes. Finally, the page must explain that these values come from one climate
+        model and represent possible futures rather than exact forecasts.
+      </p>
+    </section>
+
+    <section class="section narrow data-note">
+      <h2>About the data</h2>
+      <p>
+        The prototype uses monthly CMIP6 projections from the NASA GISS-E2-1-G model.
+        Warming is measured from the 2015–2024 average and summarized with a ten-year
+        rolling mean. The results show one model run, so they do not represent the full
+        range of uncertainty across all climate models.
+      </p>
     </section>
   </main>
 

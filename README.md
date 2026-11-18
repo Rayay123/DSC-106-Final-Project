@@ -20,21 +20,21 @@ The page will begin with the global temperature trend to show when the scenarios
 
 The first prototype will focus on temperature. We may return to precipitation later if it adds a clear part to the story, but we do not want to combine unrelated charts just for variety.
 
-## Current repository contents
+## Current prototype
 
-Right now, the repository contains our proposal and early static figures. The interactive webpage and D3 visualizations have not been built yet.
+The main page now includes the project question, an interactive place-based warming comparison, the required prototype reflections, and a short explanation of the data. The visualization lets the reader click a map square or choose a preset location, compare the three emissions scenarios over time, and optionally adjust the chart scale.
 
+- `index.html`, `style.css`, and `main.js` contain the main page.
+- `pick-a-place-model/` contains the current D3 map, linked line chart, and browser-ready data.
 - `FINAL_PROJECT_PROPOSAL_DRAFT.md` contains the proposal.
-- `figures/` contains the exploratory charts created so far.
+- `figures/` contains the earlier exploratory charts.
 
-## Work for the initial prototype
+## Next steps
 
-- Create the HTML and CSS structure for the explorable page.
-- Prepare a smaller browser-ready temperature dataset.
-- Build one D3 visualization with a working year interaction.
-- Add a title, legend, labels, and short explanatory text.
-- Write the two required prototype reflections.
-- Publish the page with GitHub Pages and test the public link.
+- Decide how the supporting regional chart should fit into the story.
+- Add a small number of annotations to guide readers toward the strongest patterns.
+- Test the page on different screen sizes and revise any crowded labels.
+- Continue developing the story and final takeaway after receiving prototype feedback.
 
 ## Proposed work split
 
