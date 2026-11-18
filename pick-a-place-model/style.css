@@ -1,0 +1,253 @@
+:root {
+  color-scheme: light;
+
+  --text: #1c2128;
+  --muted: #5c6670;
+  --bg: #fbfaf7;
+  --surface: #ffffff;
+  --border: #e3e1db;
+
+  --cool: #2b6cb0;
+  --mid: #c08a1e;
+  --warm: #c53030;
+
+  --serif: Georgia, "Times New Roman", serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  --max-width: 1000px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2 {
+  font-family: var(--serif);
+  line-height: 1.2;
+}
+
+/* ---------- Header ---------- */
+.hero {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 3.5rem 1.25rem 1.5rem;
+  text-align: center;
+}
+
+.eyebrow {
+  margin: 0 0 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: clamp(1.9rem, 4.5vw, 2.8rem);
+}
+
+.subtitle {
+  margin: 0.9rem auto 0;
+  max-width: 38rem;
+  color: var(--muted);
+  font-size: 1.1rem;
+}
+
+/* ---------- Layout ---------- */
+main {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0 1.25rem 4rem;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.25rem 1.25rem 1rem;
+  margin-top: 1.25rem;
+}
+
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.panel h2 {
+  margin: 0;
+  font-size: 1.3rem;
+}
+
+.note {
+  margin: 0.2rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.picker {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.picker select {
+  font: inherit;
+  color: var(--text);
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.figure svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* ---------- Map ---------- */
+#map svg { cursor: crosshair; }
+
+.sphere {
+  fill: #f1f3f5;
+  stroke: #c9ced4;
+}
+
+.country {
+  fill: none;
+  stroke: #1c2128;
+  stroke-opacity: 0.35;
+  stroke-width: 0.6;
+  pointer-events: none;
+}
+
+.selected-cell {
+  fill: none;
+  stroke: #111;
+  stroke-width: 2;
+  pointer-events: none;
+}
+
+.selected-dot {
+  fill: #111;
+  stroke: #fff;
+  stroke-width: 1.5;
+  pointer-events: none;
+}
+
+#map-legend {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.5rem;
+}
+
+/* ---------- Chart ---------- */
+.readout {
+  margin: 0 0 0.75rem;
+  font-size: 1.05rem;
+}
+
+.readout .place-title { font-family: var(--serif); font-size: 1.2rem; }
+.readout .place-meta { color: var(--muted); font-size: 0.9rem; }
+
+.axis text { fill: var(--muted); font-size: 12px; }
+.axis line, .axis path { stroke: #c9ced4; }
+.grid line { stroke: #eceae4; }
+.zero-line { stroke: #9aa4ae; }
+
+.gap-band { opacity: 0.1; }
+
+.series { fill: none; stroke-width: 2.5; }
+.series-global { fill: none; stroke-width: 1.2; stroke-dasharray: 5 4; opacity: 0.7; }
+
+.end-label { font-size: 12px; font-weight: 600; }
+
+.hover-rule { stroke: #1c2128; stroke-opacity: 0.35; }
+.hover-dot { stroke: #fff; stroke-width: 1.5; }
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem 1.25rem;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.swatch-line {
+  display: inline-block;
+  width: 20px;
+  height: 0;
+  border-top: 3px solid currentColor;
+}
+.swatch-dashed { border-top: 2px dashed var(--muted); }
+.swatch-band {
+  display: inline-block;
+  width: 16px;
+  height: 12px;
+  background: var(--warm);
+  opacity: 0.18;
+}
+
+.fit-toggle {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.caveat {
+  margin: 1.25rem auto 0;
+  max-width: 46rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+/* ---------- Tooltip ---------- */
+.tooltip {
+  position: fixed;
+  z-index: 10;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  opacity: 0;
+  transition: opacity 100ms;
+}
+
+.tooltip .tt-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}

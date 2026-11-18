@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pick a Place · Two Climate Futures</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="main.js"></script>
+</head>
+<body>
+  <header class="hero">
+    <p class="eyebrow">Prototype · Pick a Place</p>
+    <h1>How much warmer could it get where you live?</h1>
+    <p class="subtitle">
+      Click anywhere on the map, or choose a place, to see how its temperature changes
+      under low, middle and high emissions.
+    </p>
+  </header>
+
+  <main>
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Where is the gap largest?</h2>
+          <p class="note">Color shows how much warmer SSP5-8.5 is than SSP1-2.6 by 2091–2100.</p>
+        </div>
+        <label class="picker">
+          <span>Jump to</span>
+          <select id="preset"></select>
+        </label>
+      </div>
+      <div id="map" class="figure"></div>
+      <div id="map-legend"></div>
+    </section>
+
+    <section class="panel">
+      <p id="readout" class="readout" aria-live="polite"></p>
+      <div id="chart" class="figure"></div>
+      <div id="chart-legend" class="chart-legend"></div>
+      <label class="fit-toggle">
+        <input type="checkbox" id="fit-y" />
+        Zoom the y-axis to this place (off = same scale for every place, for fair comparison)
+      </label>
+    </section>
+
+    <p class="caveat">
+      Each square is 4° × 5° (roughly 450 km across at the equator), so a coastal city's square
+      mixes land and ocean. Warming is measured from the 2015–2024 average and smoothed with a
+      10-year rolling mean. One climate model (NASA GISS-E2-1-G), one run.
+    </p>
+  </main>
+
+  <div id="tooltip" class="tooltip" role="status"></div>
+</body>
+</html>
