@@ -1,1 +1,15 @@
-import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
+const prototypeFrame=document.querySelector("#prototype-frame");
+
+if(prototypeFrame){
+  prototypeFrame.addEventListener("load",()=>{
+    let frameBody=prototypeFrame.contentDocument?.body;
+    if(!frameBody) return;
+
+    function resizeFrame(){
+      prototypeFrame.style.height=`${frameBody.scrollHeight+8}px`;
+    }
+
+    resizeFrame();
+    new ResizeObserver(resizeFrame).observe(frameBody);
+  });
+}
