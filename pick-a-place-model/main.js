@@ -840,91 +840,15 @@ function updateReadout() {
   );
 }
 
-// When the note changes, its text collapses closed, swaps, and opens back up.
-// If the new place has the same note (e.g. Australia → Saudi Arabia share the dry-land
-// note), it stays open untouched.
-//
-// The outer box is an invisible placeholder with a fixed height (that of the longest note),
-// so the page never gets shorter and longer as notes change; the visible card inside it
-// (background, gold edge and text) is what closes and reopens.
-const scienceNote = d3.select("#science-note");
-const NOTE_CLOSE_MS = 240;  // matches the CSS transition on .science-note-anim
-const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-let shownNote = null;       // the note on screen (or about to be, once it reopens)
-let noteSwapTimer = null;
-
-// Built once and kept: .science-note-anim is what collapses (it must persist across note
-// changes for its CSS transition to run); .science-note-inner clips the text while it
-// shrinks; the padding sits on .science-note-body, since padding itself can't shrink.
-scienceNote.html(
-  `<div class="science-note-anim"><div class="science-note-inner">` +
-  `<div class="science-note-body"></div></div></div>`
-);
-const scienceNoteBody = scienceNote.select(".science-note-body");
-
-function noteHtml(note) {
+function updateScienceNote() {
+  const note = SCIENCE_NOTES[current.scienceKey] || GENERAL_SCIENCE_NOTE;
   const source = note.url
     ? `<a href="${note.url}" target="_blank" rel="noreferrer">${note.source}</a>`
     : "";
-  return `<h3>${note.title}</h3><p>${note.text}</p>${source}`;
-}
 
-function renderScienceNote(note) {
-  scienceNoteBody.html(noteHtml(note));
-}
-
-// Reserve the height of the longest note at the box's current width, by rendering each
-// note into an invisible copy of the box and measuring it.
-const ALL_NOTES = [...new Set([...Object.values(SCIENCE_NOTES), GENERAL_SCIENCE_NOTE])];
-let reservedForWidth = 0;
-
-function reserveNoteHeight() {
-  const box = scienceNote.node();
-  const width = box.getBoundingClientRect().width;
-  if (!width || width === reservedForWidth) return;
-  reservedForWidth = width;
-  const probe = box.cloneNode(true);
-  probe.removeAttribute("id");
-  probe.removeAttribute("aria-live");
-  probe.classList.remove("is-closed");
-  Object.assign(probe.style, {
-    position: "absolute", visibility: "hidden", pointerEvents: "none",
-    width: `${width}px`, minHeight: "0", left: "0", top: "0",
-  });
-  box.parentNode.appendChild(probe);
-  const probeBody = probe.querySelector(".science-note-body");
-  let tallest = 0;
-  for (const note of ALL_NOTES) {
-    probeBody.innerHTML = noteHtml(note);
-    tallest = Math.max(tallest, probe.getBoundingClientRect().height);
-  }
-  probe.remove();
-  scienceNote.style("min-height", `${Math.ceil(tallest)}px`);
-}
-
-// Re-measure when the box's width changes (window resize): text wraps differently.
-new ResizeObserver(reserveNoteHeight).observe(scienceNote.node());
-
-function updateScienceNote() {
-  const note = SCIENCE_NOTES[current.scienceKey] || GENERAL_SCIENCE_NOTE;
-  if (note === shownNote) return;  // same explanation: leave it as is
-  const firstNote = shownNote === null;
-  shownNote = note;
-
-  // First note on page load, or reader prefers reduced motion: just show it.
-  if (firstNote || reducedMotion.matches) {
-    renderScienceNote(note);
-    return;
-  }
-  // Already closing from a click moments ago: it will reopen with the latest note.
-  if (noteSwapTimer) return;
-
-  scienceNote.classed("is-closed", true);
-  noteSwapTimer = setTimeout(() => {
-    noteSwapTimer = null;
-    renderScienceNote(shownNote);
-    scienceNote.classed("is-closed", false);
-  }, NOTE_CLOSE_MS);
+  d3.select("#science-note").html(
+    `<h3>${note.title}</h3><p>${note.text}</p>${source}`
+  );
 }
 
 // ---------------------------------------------------------------------------
