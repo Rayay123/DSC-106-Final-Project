@@ -356,13 +356,36 @@ main {
   line-height: 1.45;
 }
 
+/* #science-note is an invisible placeholder with a fixed height (main.js sets min-height to
+   the longest note's height), so the page doesn't change length when notes change.
+   Inside it, the visible card (.science-note-anim: background, gold edge and text)
+   collapses closed and reopens when the note changes (main.js toggles .is-closed).
+   A one-row grid going from 1fr to 0fr animates to the text's real height without
+   measuring it. The padding is on .science-note-body, inside the clipping wrapper, because
+   padding can't shrink and would stop the card short of fully closed. */
 .science-note {
   max-width: 54rem;
   margin: 1rem auto 0;
-  padding: 0.8rem 1rem;
+}
+.science-note-anim {
+  display: grid;
+  grid-template-rows: 1fr;
   border-left: 4px solid var(--mid);
   border-radius: 0 6px 6px 0;
   background: #f5f1e7;
+  transition: grid-template-rows 0.24s ease, opacity 0.24s ease;
+}
+.science-note.is-closed .science-note-anim {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+.science-note-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+.science-note-body { padding: 0.8rem 1rem; }
+@media (prefers-reduced-motion: reduce) {
+  .science-note-anim { transition: none; }
 }
 
 .science-note h3 {
