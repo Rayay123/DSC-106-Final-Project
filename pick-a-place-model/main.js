@@ -656,9 +656,7 @@ const mapMove = rafThrottle(event => {
 
 d3.select(window).on("keydown.mapzoom", event => {
   if (event.key === "Escape") {
-    // An expanded chart covers the map, so Esc shrinks it back beside the map first.
-    if (chartState === "maximized") setChartState("docked");
-    else if (drag) endDrag();
+    if (drag) endDrag();
     else if (targetZoom.k > 1) zoomTo(d3.zoomIdentity);
   }
 });
@@ -740,7 +738,7 @@ function updateReadout() {
     `<strong style="color:${s.color}">${v >= 0 ? signed(v) : `${Math.abs(v).toFixed(1)}°C`}</strong>`;
   const sameDirection = (high >= 0) === (low >= 0);
 
-  // Card title bar: always visible, even when the chart card is minimized.
+  // Card title bar with the place name.
   d3.select("#chart-title").html(
     `<strong class="place-title">${title}</strong> <span class="place-meta">${meta}</span>`);
 
@@ -754,8 +752,7 @@ function updateReadout() {
 // ---------------------------------------------------------------------------
 // Line chart
 // ---------------------------------------------------------------------------
-// The chart lives in a panel that can be narrow (beside the map, resizable) or large (expanded
-// over the map). Rather than scaling one fixed drawing (which would shrink the text to
+// The chart lives in a panel beside the map whose width can be changed by dragging the divider. Rather than scaling one fixed drawing (which would shrink the text to
 // nothing in the small card), it is laid out at its real pixel size by layoutChart(),
 // which re-runs whenever the card changes size.
 let CH_W = 960;
@@ -896,8 +893,7 @@ function layoutChart(w, h) {
   if (current) updateChart(false);
 }
 
-// Re-lay out whenever the chart's box changes size (docked ↔ expanded, window resize).
-// A minimized card hides the chart (size 0); skip that and keep the last layout.
+// Re-lay out whenever the chart's box changes size (divider drag, window resize).
 const chartBox = document.getElementById("chart");
 new ResizeObserver(([entry]) => {
   const { width, height } = entry.contentRect;
@@ -948,22 +944,10 @@ d3.select("#chart-legend").html(
 );
 
 // ---------------------------------------------------------------------------
-// Chart panel: beside the map, minimized to a thin strip, or expanded over the map
+// Chart panel: beside the map, resizable by dragging the divider
 // ---------------------------------------------------------------------------
-const ICONS = {
-  minimize: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8h9"/></svg>',
-  expand: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.5h4v4M6.5 13.5h-4v-4M13.5 2.5 9 7M2.5 13.5 7 9"/></svg>',
-  shrink: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 6.5h-4v-4M2.5 9.5h4v4M9.5 6.5l4-4M6.5 9.5l-4 4"/></svg>',
-  restore: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 4 6 8l4 4"/></svg>',  // "‹": open to the left
-};
-
 const mapLayout = d3.select("#map-layout");
-const chartCard = d3.select("#chart-card");
-const chartCardHead = d3.select(".chart-card-head");
 const chartDivider = d3.select("#chart-resize");
-const chartMinButton = d3.select("#chart-min");
-const chartMaxButton = d3.select("#chart-max");
-let chartState = "docked";  // "docked" (beside the map) | "minimized" | "maximized"
 
 // Width of the chart panel, changed by dragging the divider. The map takes the rest.
 const CHART_MIN_W = 260;
@@ -995,7 +979,7 @@ let divDrag = null;  // { x, startW }
 
 chartDivider
   .on("pointerdown", event => {
-    if (event.button !== 0 || chartState !== "docked" || stacked.matches) return;
+    if (event.button !== 0 || stacked.matches) return;
     event.preventDefault();  // no text selection while dragging
     divDrag = { x: event.clientX, startW: chartWidth };
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -1025,45 +1009,7 @@ const moveDivider = rafThrottle(event => {
 // Keep the chart width valid when the page is resized.
 new ResizeObserver(() => setChartWidth(chartWidth)).observe(mapLayout.node());
 
-function setButton(button, icon, label) {
-  button.html(ICONS[icon]).attr("aria-label", label).attr("title", label);
-}
-
-function setChartState(state) {
-  chartState = state;
-  chartCard
-    .classed("is-docked", state === "docked")
-    .classed("is-minimized", state === "minimized")
-    .classed("is-maximized", state === "maximized");
-  // The layout grid gives a minimized chart just a thin strip.
-  mapLayout.classed("chart-minimized", state === "minimized");
-  // Left button: minimize, or open a minimized panel again.
-  if (state === "minimized") setButton(chartMinButton, "restore", "Show chart");
-  else setButton(chartMinButton, "minimize", "Minimize chart");
-  // Right button: expand over the map, or shrink back beside it.
-  if (state === "maximized") setButton(chartMaxButton, "shrink", "Shrink chart back beside the map (Esc)");
-  else setButton(chartMaxButton, "expand", "Expand chart over the map");
-  hideTooltip();
-}
-
-// stopPropagation: a button click must not also reach the title-bar handler below. (Each click
-// swaps the button's icon, so the clicked icon is already detached by the time the click
-// bubbles up, and the bar's "was this a button?" check would miss it, un-minimizing the panel.)
-chartMinButton.on("click", event => {
-  event.stopPropagation();
-  setChartState(chartState === "minimized" ? "docked" : "minimized");
-});
-chartMaxButton.on("click", event => {
-  event.stopPropagation();
-  setChartState(chartState === "maximized" ? "docked" : "maximized");
-});
-// A minimized panel is just a strip with the place name; clicking it opens the chart again.
-chartCardHead.on("click", () => {
-  if (chartState === "minimized") setChartState("docked");
-});
-
 setChartWidth(chartWidth);
-setChartState("docked");
 
 // ---------------------------------------------------------------------------
 // Preset picker + initial state
