@@ -159,6 +159,7 @@ function selectPlace({ name, lat, lon }) {
   const country = countryAt(lat, lon);
   current = { name, lat, lon, cell, country, water: country ? null : waterAt(lat, lon) };
   updateMapSelection();
+  updateLegendMarker(gapOf(cell.late), true);  // purple tick on the color legend
   updateReadout();
   updateChart(true);
 }
@@ -670,10 +671,14 @@ function updateMapSelection() {
   selectedDot.attr("cx", px).attr("cy", py);
 }
 
-// Map legend: color ramp with a marker for the global-average gap
+// Map legend: color ramp with two ticks: black for the global-average gap (fixed) and
+// purple for the selected place (moves on every selection), plus a small key with both values.
+const SELECTED_TICK_COLOR = "#7b3fbf";  // purple: distinct from black and from the red–blue ramp
+let updateLegendMarker = () => {};       // set by drawMapLegend; called from selectPlace
+
 (function drawMapLegend() {
   const W = 360;
-  const H = 52;
+  const H = 72;
   const scale = d3.scaleLinear([-gapLimit, gapLimit], [12, W - 12]);
   const svg = d3.select("#map-legend").append("svg")
     .attr("viewBox", `0 0 ${W} ${H}`)
@@ -688,26 +693,71 @@ function updateMapSelection() {
     .attr("stop-color", t => mapColor(-gapLimit + t * 2 * gapLimit));
 
   svg.append("text")
-    .attr("x", W / 2).attr("y", 11)
+    .attr("x", W / 2).attr("y", 9)
     .attr("text-anchor", "middle")
     .attr("fill", "#5c6670").attr("font-size", 11)
     .text("Gap by 2091–2100 (°C), SSP5-8.5 minus SSP1-2.6");
 
   svg.append("rect")
-    .attr("x", 12).attr("y", 17)
+    .attr("x", 12).attr("y", 20)
     .attr("width", W - 24).attr("height", 10)
     .attr("fill", "url(#gap-gradient)");
 
   svg.append("g")
     .attr("class", "axis")
-    .attr("transform", "translate(0, 27)")
+    .attr("transform", "translate(0, 30)")
     .call(d3.axisBottom(scale).ticks(7).tickSize(4))
     .call(g => g.select(".domain").remove());
 
+  // Global average: fixed black tick
   svg.append("line")
     .attr("x1", scale(globalGap)).attr("x2", scale(globalGap))
-    .attr("y1", 14).attr("y2", 30)
+    .attr("y1", 17).attr("y2", 33)
     .attr("stroke", "#1c2128").attr("stroke-width", 1.5);
+
+  // Selected place: purple tick with a small pointer on top, moved by updateLegendMarker
+  const selectedTick = svg.append("g").attr("class", "legend-selected");
+  selectedTick.append("line")
+    .attr("y1", 17).attr("y2", 34)
+    .attr("stroke", "#fff").attr("stroke-width", 4.5);   // white halo so it reads on any color
+  selectedTick.append("line")
+    .attr("y1", 17).attr("y2", 34)
+    .attr("stroke", SELECTED_TICK_COLOR).attr("stroke-width", 2.5);
+  selectedTick.append("path")
+    .attr("d", "M-4.5,12 L4.5,12 L0,17.5 Z")  // pointer, just below the title
+    .attr("fill", SELECTED_TICK_COLOR);
+
+  // Key: what each tick means, with its value
+  const key = svg.append("g").attr("class", "legend-key").attr("transform", `translate(${W / 2}, ${H - 8})`);
+  const globalItem = key.append("g");
+  globalItem.append("line").attr("x1", 0).attr("x2", 0).attr("y1", -9).attr("y2", 1)
+    .attr("stroke", "#1c2128").attr("stroke-width", 1.5);
+  globalItem.append("text").attr("x", 5).attr("font-size", 10.5).attr("fill", "#5c6670")
+    .text(`Global average ${signed(globalGap)}`);
+  const selectedItem = key.append("g");
+  selectedItem.append("line").attr("x1", 0).attr("x2", 0).attr("y1", -9).attr("y2", 1)
+    .attr("stroke", SELECTED_TICK_COLOR).attr("stroke-width", 2.5);
+  const selectedText = selectedItem.append("text").attr("x", 6).attr("font-size", 10.5)
+    .attr("fill", SELECTED_TICK_COLOR).attr("font-weight", 600);
+
+  // Lay out the two key items side by side, centered under the ramp.
+  function layoutKey() {
+    const gw = globalItem.node().getBBox().width;
+    const sw = selectedItem.node().getBBox().width;
+    const gapBetween = 16;
+    const start = -(gw + gapBetween + sw) / 2;
+    globalItem.attr("transform", `translate(${start}, 0)`);
+    selectedItem.attr("transform", `translate(${start + gw + gapBetween}, 0)`);
+  }
+
+  updateLegendMarker = (gap, animate) => {
+    // Keep the tick on the ramp even for values beyond its ends.
+    const x = scale(Math.max(-gapLimit, Math.min(gapLimit, gap)));
+    selectedTick.transition().duration(animate ? 500 : 0).ease(d3.easeCubicOut)
+      .attr("transform", `translate(${x}, 0)`);
+    selectedText.text(`Selected place ${signed(gap)}`);
+    layoutKey();
+  };
 })();
 
 // ---------------------------------------------------------------------------
