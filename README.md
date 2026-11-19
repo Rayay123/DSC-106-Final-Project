@@ -22,7 +22,7 @@ The first prototype will focus on temperature. We may return to precipitation la
 
 ## Current prototype
 
-The main page now includes the project question, an interactive place-based warming comparison, the required prototype reflections, and a short explanation of the data. The visualization lets the reader click a map square or choose a marked location, compare the three emissions scenarios over time, and compare the warming gaps of two selected places.
+The main page now includes the project question, an interactive warming map, the required prototype reflections, and a short explanation of the data. The visualization lets the reader click a map square or choose a marked location, then compare the three emissions scenarios over time for that place.
 
 - `index.html`, `style.css`, and `main.js` contain the main page.
 - `pick-a-place-model/` contains the current D3 map, linked line chart, and browser-ready data.
