@@ -656,7 +656,7 @@ const mapMove = rafThrottle(event => {
 
 d3.select(window).on("keydown.mapzoom", event => {
   if (event.key === "Escape") {
-    // An expanded chart covers the map, so Esc shrinks it first.
+    // An expanded chart covers the map, so Esc shrinks it back beside the map first.
     if (chartState === "maximized") setChartState("docked");
     else if (drag) endDrag();
     else if (targetZoom.k > 1) zoomTo(d3.zoomIdentity);
@@ -744,12 +744,7 @@ function updateReadout() {
   d3.select("#chart-title").html(
     `<strong class="place-title">${title}</strong> <span class="place-meta">${meta}</span>`);
 
-  // One-line summary for the small docked card.
-  d3.select("#readout-short").html(
-    `Gap by 2091–2100: <strong>${gap >= 0 ? "+" : "−"}${Math.abs(gap).toFixed(1)}°C</strong> ` +
-    `<span class="readout-global">(global ${signed(globalGap)})</span>`);
-
-  // Full sentence for the expanded card.
+  // Full sentence under the title.
   d3.select("#readout").html(
     `By 2091–2100 this square ${verb(high)}${amount(high, SCENARIOS[HIGH])} under high emissions ` +
     `and ${sameDirection ? "" : verb(low)}${amount(low, SCENARIOS[LOW])} under low emissions. ${comparison}`
@@ -759,7 +754,7 @@ function updateReadout() {
 // ---------------------------------------------------------------------------
 // Line chart
 // ---------------------------------------------------------------------------
-// The chart lives in a card that can be small (docked in the map corner) or large (expanded
+// The chart lives in a panel that can be narrow (beside the map, resizable) or large (expanded
 // over the map). Rather than scaling one fixed drawing (which would shrink the text to
 // nothing in the small card), it is laid out at its real pixel size by layoutChart(),
 // which re-runs whenever the card changes size.
@@ -953,145 +948,73 @@ d3.select("#chart-legend").html(
 );
 
 // ---------------------------------------------------------------------------
-// Chart card: docked in the map's corner, minimized to its title bar, or expanded over the map
+// Chart panel: beside the map, minimized to a thin strip, or expanded over the map
 // ---------------------------------------------------------------------------
 const ICONS = {
   minimize: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8h9"/></svg>',
   expand: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.5h4v4M6.5 13.5h-4v-4M13.5 2.5 9 7M2.5 13.5 7 9"/></svg>',
   shrink: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 6.5h-4v-4M2.5 9.5h4v4M9.5 6.5l4-4M6.5 9.5l-4 4"/></svg>',
-  restore: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 10l4-4 4 4"/></svg>',
+  restore: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 4 6 8l4 4"/></svg>',  // "‹": open to the left
 };
 
+const mapLayout = d3.select("#map-layout");
 const chartCard = d3.select("#chart-card");
 const chartCardHead = d3.select(".chart-card-head");
-const chartResizeGrip = d3.select("#chart-resize");
+const chartDivider = d3.select("#chart-resize");
 const chartMinButton = d3.select("#chart-min");
 const chartMaxButton = d3.select("#chart-max");
-const mapWrap = document.querySelector(".map-wrap");
-let chartState = "docked";  // "docked" | "minimized" | "maximized"
+let chartState = "docked";  // "docked" (beside the map) | "minimized" | "maximized"
 
-// Where the reader has moved/resized the card to, in px inside the map:
-// { left, bottom, width?, chartH? } (bottom = gap between the card's and the map's bottom
-// edges). null = the default corner position and size from the CSS.
-// Only applied while docked or minimized; an expanded card always covers the whole map.
-let cardGeom = null;
-const CARD_PAD = 6;       // keep this far inside the map's edges
-const CARD_MIN_W = 240;   // smallest card width
-const CARD_MIN_CHART_H = 90;
-// On small screens the card sits below the map (see CSS), so it can't be moved or resized.
-const smallScreen = window.matchMedia("(max-width: 640px)");
+// Width of the chart panel, changed by dragging the divider. The map takes the rest.
+const CHART_MIN_W = 260;
+const MAP_MIN_SHARE = 0.5;  // the map always keeps at least half the row (a narrower map
+                            // is also shorter, which would squash the chart beside it)
+let chartWidth = 360;
+// Narrow screens stack the chart below the map (see CSS), so there's nothing to resize.
+const stacked = window.matchMedia("(max-width: 820px)");
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(Math.max(lo, hi), v));
 
-// Apply cardGeom to the card (or clear it), keeping the card fully inside the map.
-function applyCardGeometry() {
-  const card = chartCard.node();
-  const free = cardGeom && chartState !== "maximized" && !smallScreen.matches;
-  if (!free) {
-    card.style.left = card.style.top = card.style.bottom = card.style.width = "";
-    chartBox.style.height = "";
-    return;
-  }
-  // Size only applies to the full card; a minimized card is just its title bar.
-  const docked = chartState === "docked";
-  card.style.width = docked && cardGeom.width ? `${cardGeom.width}px` : "";
-  chartBox.style.height = docked && cardGeom.chartH ? `${cardGeom.chartH}px` : "";
-  // Anchored by its BOTTOM edge, so minimizing collapses the card down into its
-  // bottom-left corner (like the default corner position) rather than up to its top.
-  card.style.top = "auto";
-
-  // Clamp only what's displayed; cardGeom keeps the reader's choice, so e.g. a minimized bar
-  // nudged in from the edge doesn't shift the full card when it's restored.
-  const wrap = mapWrap.getBoundingClientRect();
-  const { width, height } = card.getBoundingClientRect();
-  card.style.left = `${clamp(cardGeom.left, CARD_PAD, wrap.width - width - CARD_PAD)}px`;
-  card.style.bottom = `${clamp(cardGeom.bottom, CARD_PAD, wrap.height - height - CARD_PAD)}px`;
+function setChartWidth(w) {
+  const total = mapLayout.node().getBoundingClientRect().width;
+  chartWidth = Math.round(clamp(w, CHART_MIN_W, total * (1 - MAP_MIN_SHARE)));
+  mapLayout.style("--chart-w", `${chartWidth}px`);
 }
 
-// At the start of a move/resize, record where the card actually is on screen
-// (the CSS default the first time; afterwards its clamped, displayed position).
-// `bottom` is the distance from the map's bottom edge to the card's bottom edge.
-function ensureCardGeom() {
-  const wrap = mapWrap.getBoundingClientRect();
-  const r = chartCard.node().getBoundingClientRect();
-  cardGeom = { ...cardGeom, left: r.left - wrap.left, bottom: wrap.bottom - r.bottom };
-  if (chartState === "docked") {
-    cardGeom.width = r.width;
-    cardGeom.chartH = chartBox.getBoundingClientRect().height;
-  }
-}
+// Drag the divider: moving it left widens the chart, moving it right narrows it.
+let divDrag = null;  // { x, startW }
 
-// Move by dragging the title bar; resize with the corner grip.
-let cardDrag = null;           // { mode: "move" | "resize", x, y, start, cardH, moved }
-let suppressHeadClick = false; // a drag of the title bar shouldn't also count as a click
+chartDivider
+  .on("pointerdown", event => {
+    if (event.button !== 0 || chartState !== "docked" || stacked.matches) return;
+    event.preventDefault();  // no text selection while dragging
+    divDrag = { x: event.clientX, startW: chartWidth };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    mapLayout.classed("is-resizing", true);
+    hideTooltip();
+  })
+  .on("pointermove", event => moveDivider(event))
+  .on("pointerup pointercancel", () => {
+    moveDivider.flush();
+    divDrag = null;
+    mapLayout.classed("is-resizing", false);
+  })
+  // Keyboard: focus the divider and use the arrow keys.
+  .attr("tabindex", 0)
+  .on("keydown", event => {
+    const step = event.shiftKey ? 60 : 20;
+    if (event.key === "ArrowLeft") setChartWidth(chartWidth + step);
+    else if (event.key === "ArrowRight") setChartWidth(chartWidth - step);
+    else return;
+    event.preventDefault();
+  });
 
-function startCardDrag(event, mode) {
-  if (event.button !== 0 || chartState === "maximized" || smallScreen.matches) return;
-  if (mode === "move" && event.target.closest("button")) return;  // buttons keep working
-  event.preventDefault();  // no text selection while dragging
-  ensureCardGeom();
-  cardDrag = {
-    mode, x: event.clientX, y: event.clientY, start: { ...cardGeom },
-    cardH: chartCard.node().getBoundingClientRect().height, moved: false,
-  };
-  event.currentTarget.setPointerCapture(event.pointerId);
-}
-
-const moveCardDrag = rafThrottle(event => {
-  if (!cardDrag) return;
-  const dx = event.clientX - cardDrag.x;
-  const dy = event.clientY - cardDrag.y;
-  if (!cardDrag.moved && Math.hypot(dx, dy) < 3) return;
-  cardDrag.moved = true;
-  chartCard.classed("is-dragging", true);
-  hideTooltip();
-  const { start } = cardDrag;
-  const card = chartCard.node();
-  if (cardDrag.mode === "move") {
-    cardGeom.left = start.left + dx;
-    cardGeom.bottom = start.bottom - dy;
-    applyCardGeometry();
-  } else {
-    // Resize from the bottom-right corner; the top-left corner stays put.
-    const wrap = mapWrap.getBoundingClientRect();
-    const top = wrap.height - start.bottom - cardDrag.cardH;  // card's top edge, held fixed
-    const chrome = cardDrag.cardH - start.chartH;  // title bar, summary line, padding
-    cardGeom.width = clamp(start.width + dx, CARD_MIN_W, wrap.width - start.left - CARD_PAD);
-    cardGeom.chartH = clamp(start.chartH + dy, CARD_MIN_CHART_H, wrap.height - top - chrome - CARD_PAD);
-    applyCardGeometry();
-    // The card is anchored by its bottom, so move the bottom to keep the top in place.
-    // (Measured, because the summary line can wrap differently at the new width.)
-    cardGeom.bottom = wrap.height - top - card.getBoundingClientRect().height;
-    applyCardGeometry();
-  }
-  // Store where the card actually ended up (inside the map), not where the pointer went.
-  cardGeom.left = parseFloat(card.style.left);
-  cardGeom.bottom = parseFloat(card.style.bottom);
+const moveDivider = rafThrottle(event => {
+  if (divDrag) setChartWidth(divDrag.startW - (event.clientX - divDrag.x));
 });
 
-function endCardDrag() {
-  moveCardDrag.flush();
-  if (cardDrag?.moved && cardDrag.mode === "move") {
-    suppressHeadClick = true;
-    setTimeout(() => { suppressHeadClick = false; });  // the click (if any) fires before this
-  }
-  cardDrag = null;
-  chartCard.classed("is-dragging", false);
-}
-
-chartCardHead
-  .on("pointerdown", event => startCardDrag(event, "move"))
-  .on("pointermove", event => moveCardDrag(event))
-  .on("pointerup pointercancel", endCardDrag);
-chartResizeGrip
-  .on("pointerdown", event => startCardDrag(event, "resize"))
-  .on("pointermove", event => moveCardDrag(event))
-  .on("pointerup pointercancel", endCardDrag);
-
-// Keep the card inside the map when the map changes size (window resize),
-// and drop/restore the custom geometry when crossing the small-screen breakpoint.
-new ResizeObserver(() => applyCardGeometry()).observe(mapWrap);
-smallScreen.addEventListener("change", applyCardGeometry);
+// Keep the chart width valid when the page is resized.
+new ResizeObserver(() => setChartWidth(chartWidth)).observe(mapLayout.node());
 
 function setButton(button, icon, label) {
   button.html(ICONS[icon]).attr("aria-label", label).attr("title", label);
@@ -1103,19 +1026,20 @@ function setChartState(state) {
     .classed("is-docked", state === "docked")
     .classed("is-minimized", state === "minimized")
     .classed("is-maximized", state === "maximized");
-  // Left button: minimize, or bring a minimized card back to the corner.
+  // The layout grid gives a minimized chart just a thin strip.
+  mapLayout.classed("chart-minimized", state === "minimized");
+  // Left button: minimize, or open a minimized panel again.
   if (state === "minimized") setButton(chartMinButton, "restore", "Show chart");
   else setButton(chartMinButton, "minimize", "Minimize chart");
-  // Right button: expand over the map, or shrink back to the corner.
-  if (state === "maximized") setButton(chartMaxButton, "shrink", "Shrink chart to the corner (Esc)");
+  // Right button: expand over the map, or shrink back beside it.
+  if (state === "maximized") setButton(chartMaxButton, "shrink", "Shrink chart back beside the map (Esc)");
   else setButton(chartMaxButton, "expand", "Expand chart over the map");
-  applyCardGeometry();  // reader's position/size when docked or minimized; full map when expanded
   hideTooltip();
 }
 
 // stopPropagation: a button click must not also reach the title-bar handler below. (Each click
 // swaps the button's icon, so the clicked icon is already detached by the time the click
-// bubbles up, and the bar's "was this a button?" check would miss it, un-minimizing the card.)
+// bubbles up, and the bar's "was this a button?" check would miss it, un-minimizing the panel.)
 chartMinButton.on("click", event => {
   event.stopPropagation();
   setChartState(chartState === "minimized" ? "docked" : "minimized");
@@ -1124,13 +1048,12 @@ chartMaxButton.on("click", event => {
   event.stopPropagation();
   setChartState(chartState === "maximized" ? "docked" : "maximized");
 });
-// A minimized card is just its title bar; clicking anywhere else on it brings the chart back
-// (but not when the reader was dragging it somewhere).
+// A minimized panel is just a strip with the place name; clicking it opens the chart again.
 chartCardHead.on("click", () => {
-  if (suppressHeadClick) return;
   if (chartState === "minimized") setChartState("docked");
 });
 
+setChartWidth(chartWidth);
 setChartState("docked");
 
 // ---------------------------------------------------------------------------

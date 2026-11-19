@@ -32,12 +32,18 @@
           <select id="preset"></select>
         </label>
       </div>
-      <div class="map-wrap">
-        <div id="map" class="figure"></div>
-        <button type="button" id="zoom-reset" class="zoom-reset" hidden>Reset zoom (Esc)</button>
+      <!-- Map and line chart side by side. The divider between them can be dragged to
+           resize the chart; the chart can also be minimized to a thin strip or expanded
+           over the map. State is set by main.js. -->
+      <div id="map-layout" class="map-layout">
+        <div class="map-wrap">
+          <div id="map" class="figure"></div>
+          <button type="button" id="zoom-reset" class="zoom-reset" hidden>Reset zoom (Esc)</button>
+        </div>
 
-        <!-- Line chart card: docked in the map's corner, minimized to its title bar,
-             or expanded to cover the whole map. State is set by main.js. -->
+        <div id="chart-resize" class="chart-divider" role="separator" aria-orientation="vertical"
+             title="Drag to resize the chart"></div>
+
         <aside id="chart-card" class="chart-card is-docked" aria-label="Warming over time at the selected place">
           <div class="chart-card-head">
             <div id="chart-title" class="chart-card-title" aria-live="polite"></div>
@@ -47,13 +53,10 @@
             </div>
           </div>
           <div class="chart-card-body">
-            <p id="readout-short" class="readout-short"></p>
             <p id="readout" class="readout"></p>
             <div id="chart"></div>
             <div id="chart-legend" class="chart-legend"></div>
           </div>
-          <!-- Drag to resize the docked card -->
-          <div id="chart-resize" class="chart-card-resize" title="Drag to resize" aria-hidden="true"></div>
         </aside>
       </div>
       <div id="map-legend"></div>
