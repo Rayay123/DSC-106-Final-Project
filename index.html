@@ -20,6 +20,7 @@
   </header>
 
   <main>
+    <!-- The old question and the intro to the viz 
     <section class="section narrow">
       <h2>The question</h2>
       <p class="lead">
@@ -37,7 +38,7 @@
           emissions scenarios change over time.
         </p>
       </div>
-
+    -->
       <iframe
         id="prototype-frame"
         class="prototype-frame"
@@ -60,22 +61,30 @@
 
       <h3>What have we done so far?</h3>
       <p>
-        We started by narrowing the project to one question about how the warming gap
-        changes across locations. We prepared a smaller browser-ready version of the
-        CMIP6 temperature data for the low, middle, and high emissions scenarios. We
-        built a clickable world map that updates a line chart when the reader chooses
-        a location. We also added direct values, a color legend, preset locations, and
-        an optional y-axis adjustment so the different places are easier to explore.
+        We narrowed the project scope to focus on one question about how the warming gap
+        changes/varies across locations. We then prepared the data for the prototype by 
+        converting the temperature, averaging yearly values, and calculates the warming since 
+        2015-2024. This was done for the low, middle, and high emission scenarios. 
+        We then built the visualization using an interactive world map that has a tooltip,
+        clickable location selection, markers for specific locations, and labels. 
+        We also added a legend, a dropdown for specific locations, and a line chart that 
+        updates based on which location is selected, allowing for closer examination over time. 
+        We supplemented the line plot with details about the change in temperature, type of scenario,
+        and a comprehensive legend.
       </p>
 
       <h3>What will be the most challenging part to design, and why?</h3>
       <p>
-        The hardest part will be showing local differences without making the data
-        look more precise than it is. Each map square covers a large area, so a square
-        near a coast can include both land and ocean. We also need to keep the chart
-        scales fair across locations while still letting readers notice smaller local
-        changes. Finally, the page must explain that these values come from one climate
-        model and represent possible futures rather than exact forecasts.
+
+        The most challenging part to design will be a comparison between two locations that the 
+        viewer can choose. This is difficult because using two comparison plots at the side would make the 
+        page cluttered and putting it at the bottom would make it difficult for the user to switch 
+        between the top and bottom visualizations. However a comparison on a single plot woudl also be difficult,
+        as the existing line plot already has three scenario lines, a shaded gap,
+        and reference lines.
+        We also need to decide which details would make the comparison meaningful. Another challenge
+        with the location comparison is how to show the two selections on the map, how to deselect one another,
+        and how the line plot below will change along with the selection.  
       </p>
     </section>
 
