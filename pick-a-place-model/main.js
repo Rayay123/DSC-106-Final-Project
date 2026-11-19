@@ -415,7 +415,7 @@ const zoomBrush = mapSvg.append("rect").attr("class", "zoom-brush").style("displ
 // ---------------------------------------------------------------------------
 // Map zoom
 // ---------------------------------------------------------------------------
-const MAX_ZOOM = 12;       // ~6 squares across at the deepest zoom
+const MAX_ZOOM = 12;       // ~12 squares across at the deepest zoom
 const CLICK_ZOOM = 4;      // zoom level for the first click on an unzoomed map
 const DRAG_THRESHOLD = 5;  // screen pixels before a press counts as a drag
 
