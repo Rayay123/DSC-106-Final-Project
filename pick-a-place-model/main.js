@@ -975,7 +975,7 @@ const MAP_MIN_SHARE = 0.4;  // the map always keeps at least 40% of the row
 // the map" (which shrinks as the map narrows), so every widening also makes the chart taller.
 const CHART_ASPECT = 0.88;  // chart height ÷ panel width
 const CHART_MIN_H = 180;
-const CHART_MAX_H = 600;
+const CHART_MAX_H = 300;
 let chartWidth = 360;
 // Narrow screens stack the chart below the map (see CSS), so there's nothing to resize.
 const stacked = window.matchMedia("(max-width: 820px)");
