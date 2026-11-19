@@ -16,13 +16,13 @@ We are continuing with the CMIP6 climate projections from Project 3. The current
 
 ## Prototype direction
 
-The page will begin with the global temperature trend to show when the scenarios separate. The main planned view is a D3 map of the temperature difference between SSP5-8.5 and SSP1-2.6. A year slider will let the reader see how the gap changes from 2020 to 2100. We also plan to use the regional or latitude comparison to explain why the warming gap is not evenly distributed around the world.
+The main view is a D3 map of the temperature difference between SSP5-8.5 and SSP1-2.6. Readers can choose a marked region or click the map, then use the linked line chart to see how the three scenarios change over time. The marked regions also include short scientific explanations for the patterns shown in the model.
 
 The first prototype will focus on temperature. We may return to precipitation later if it adds a clear part to the story, but we do not want to combine unrelated charts just for variety.
 
 ## Current prototype
 
-The main page now includes the project question, an interactive place-based warming comparison, the required prototype reflections, and a short explanation of the data. The visualization lets the reader click a map square or choose a preset location, compare the three emissions scenarios over time, and optionally adjust the chart scale.
+The main page now includes the project question, an interactive place-based warming comparison, the required prototype reflections, and a short explanation of the data. The visualization lets the reader click a map square or choose a marked location, compare the three emissions scenarios over time, and compare the warming gaps of two selected places.
 
 - `index.html`, `style.css`, and `main.js` contain the main page.
 - `pick-a-place-model/` contains the current D3 map, linked line chart, and browser-ready data.
@@ -32,7 +32,6 @@ The main page now includes the project question, an interactive place-based warm
 ## Next steps
 
 - Decide how the supporting regional chart should fit into the story.
-- Add a small number of annotations to guide readers toward the strongest patterns.
 - Test the page on different screen sizes and revise any crowded labels.
 - Continue developing the story and final takeaway after receiving prototype feedback.
 

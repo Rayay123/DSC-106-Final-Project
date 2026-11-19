@@ -191,18 +191,41 @@ function hideTooltip() {
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
-let current = null;   // { name, lat, lon, cell, country }
+let current = null;      // primary place shown in the three-scenario chart
+let comparison = null;   // optional second place shown in the gap comparison
 
-function selectPlace({ name, lat, lon, scienceKey = null }) {
+function placeState({ name, lat, lon, scienceKey = null }) {
   const cell = cellAt(lat, lon);
-  if (!cell) return;
+  if (!cell) return null;
   const country = countryAt(lat, lon);
-  current = { name, lat, lon, cell, country, water: country ? null : waterAt(lat, lon), scienceKey };
+  return { name, lat, lon, cell, country, water: country ? null : waterAt(lat, lon), scienceKey };
+}
+
+function selectPlace(place) {
+  const next = placeState(place);
+  if (!next) return;
+  current = next;
+
+  if (comparison && cellKey(comparison.lat, comparison.lon) === cellKey(current.lat, current.lon)) {
+    comparison = null;
+    comparisonSelect.property("value", "");
+  }
+
   updateMapSelection();
-  updateLegendMarker(gapOf(cell.late), true);  // purple tick on the color legend
+  updateLegendMarker(gapOf(current.cell.late), true);  // purple tick on the color legend
   updateReadout();
   updateScienceNote();
   updateChart(true);
+  updateComparison();
+}
+
+function selectComparison(place) {
+  comparison = place ? placeState(place) : null;
+  if (comparison && cellKey(comparison.lat, comparison.lon) === cellKey(current.lat, current.lon)) {
+    comparison = null;
+    comparisonSelect.property("value", "");
+  }
+  updateComparison();
 }
 
 // ---------------------------------------------------------------------------
@@ -308,6 +331,8 @@ const oceanLabels = oceanLayer
 
 const selectedCell = zoomG.append("rect").attr("class", "selected-cell");
 const selectedDot = zoomG.append("circle").attr("class", "selected-dot").attr("r", 4);
+const comparisonCell = zoomG.append("rect").attr("class", "comparison-cell").style("display", "none");
+const comparisonDot = zoomG.append("circle").attr("class", "comparison-dot").attr("r", 4).style("display", "none");
 
 // Alert markers: a "!" warning sign pointing at the largest-gap square in each area.
 //   label:     shown on the map as "label: +gap"
@@ -491,6 +516,7 @@ function applyZoom(t) {
   shownZoom = t;
   zoomG.attr("transform", t.toString());
   selectedDot.attr("r", 4 / t.k);  // keep the dot the same size on screen
+  comparisonDot.attr("r", 4 / t.k);
   alertMarkers.attr("transform", a => `translate(${a.x}, ${a.y}) scale(${1 / t.k})`);
   oceanLabels.attr("transform", o => `translate(${o.x}, ${o.y}) scale(${1 / t.k})`);
   placeAlertLabels(t);
@@ -708,6 +734,22 @@ function updateMapSelection() {
   const [px, py] = projection([current.lon, current.lat]);
   selectedCell.attr("x", box.x).attr("y", box.y).attr("width", box.width).attr("height", box.height);
   selectedDot.attr("cx", px).attr("cy", py);
+}
+
+function updateComparisonSelection() {
+  if (!comparison) {
+    comparisonCell.style("display", "none");
+    comparisonDot.style("display", "none");
+    return;
+  }
+
+  const box = cellBox(comparison.cell);
+  const [px, py] = projection([comparison.lon, comparison.lat]);
+  comparisonCell
+    .style("display", null)
+    .attr("x", box.x).attr("y", box.y)
+    .attr("width", box.width).attr("height", box.height);
+  comparisonDot.style("display", null).attr("cx", px).attr("cy", py);
 }
 
 // Map legend: color ramp with two ticks: black for the global-average gap (fixed) and
@@ -1114,9 +1156,162 @@ new ResizeObserver(() => setChartWidth(chartWidth)).observe(mapLayout.node());
 setChartWidth(chartWidth);
 
 // ---------------------------------------------------------------------------
+// Two-place gap comparison
+// ---------------------------------------------------------------------------
+const PRIMARY_COMPARE_COLOR = "#7b3fbf";
+const SECONDARY_COMPARE_COLOR = "#0f766e";
+const COMPARE_W = 960;
+const COMPARE_H = 300;
+const CM = { top: 24, right: 155, bottom: 38, left: 52 };
+
+const comparisonPanel = d3.select("#comparison-panel");
+const comparisonSummary = d3.select("#comparison-summary");
+const compareX = d3.scaleLinear().domain([years[0], years[years.length - 1]])
+  .range([CM.left, COMPARE_W - CM.right]);
+const compareY = d3.scaleLinear().range([COMPARE_H - CM.bottom, CM.top]);
+const compareLine = d3.line()
+  .x(d => compareX(d.year))
+  .y(d => compareY(d.value));
+
+const compareSvg = d3.select("#compare-chart")
+  .append("svg")
+  .attr("viewBox", `0 0 ${COMPARE_W} ${COMPARE_H}`)
+  .attr("role", "img");
+
+const compareGrid = compareSvg.append("g").attr("class", "grid")
+  .attr("transform", `translate(${CM.left}, 0)`);
+const compareXAxis = compareSvg.append("g").attr("class", "axis")
+  .attr("transform", `translate(0, ${COMPARE_H - CM.bottom})`);
+const compareYAxis = compareSvg.append("g").attr("class", "axis")
+  .attr("transform", `translate(${CM.left}, 0)`);
+const compareZero = compareSvg.append("line").attr("class", "zero-line")
+  .attr("x1", CM.left).attr("x2", COMPARE_W - CM.right);
+const comparePaths = compareSvg.append("g");
+const compareLabels = compareSvg.append("g");
+
+compareSvg.append("text")
+  .attr("class", "axis-title")
+  .attr("x", CM.left).attr("y", 14)
+  .text("High-minus-low emissions warming gap (°C)");
+
+let compareSeries = [];
+const compareHoverRule = compareSvg.append("line").attr("class", "hover-rule")
+  .attr("y1", CM.top).attr("y2", COMPARE_H - CM.bottom).style("display", "none");
+const compareHoverDots = compareSvg.append("g");
+
+compareSvg.append("rect")
+  .attr("x", CM.left).attr("y", CM.top)
+  .attr("width", COMPARE_W - CM.left - CM.right)
+  .attr("height", COMPARE_H - CM.top - CM.bottom)
+  .attr("fill", "transparent")
+  .on("pointermove", event => {
+    if (!compareSeries.length) return;
+    const [px] = d3.pointer(event, compareSvg.node());
+    const year = Math.max(years[0], Math.min(years[years.length - 1], Math.round(compareX.invert(px))));
+    const i = year - years[0];
+
+    compareHoverRule.attr("x1", compareX(year)).attr("x2", compareX(year)).style("display", null);
+    compareHoverDots.selectAll("circle")
+      .data(compareSeries, d => d.role)
+      .join("circle")
+      .attr("class", "hover-dot")
+      .attr("r", 4)
+      .attr("fill", d => d.color)
+      .attr("cx", compareX(year))
+      .attr("cy", d => compareY(d.values[i].value));
+
+    const rows = compareSeries.map(d =>
+      `<div class="tt-row"><span style="color:${d.color}">${d.name}</span><strong>${signed(d.values[i].value)}</strong></div>`
+    ).join("");
+    showTooltip(event, `<strong>${year}</strong> <span style="color:#5c6670">(10-yr mean)</span>${rows}`);
+  })
+  .on("pointerleave", () => {
+    compareHoverRule.style("display", "none");
+    compareHoverDots.selectAll("circle").remove();
+    hideTooltip();
+  });
+
+function placeLabel(place) {
+  const label = place.name || place.country || place.water || "Open ocean";
+  return label.replace(/ \((largest|lowest) gap\)$/, "");
+}
+
+function gapSeries(place) {
+  return years.map((year, i) => ({
+    year,
+    value: place.cell.ssp585[i] - place.cell.ssp126[i],
+  }));
+}
+
+function updateComparison() {
+  compareHoverRule.style("display", "none");
+  compareHoverDots.selectAll("circle").remove();
+  hideTooltip();
+  updateComparisonSelection();
+
+  if (!current || !comparison) {
+    comparisonPanel.property("hidden", true);
+    compareSeries = [];
+    return;
+  }
+
+  comparisonPanel.property("hidden", false);
+  compareSeries = [
+    { role: "primary", name: placeLabel(current), color: PRIMARY_COMPARE_COLOR, values: gapSeries(current) },
+    { role: "comparison", name: placeLabel(comparison), color: SECONDARY_COMPARE_COLOR, values: gapSeries(comparison) },
+  ];
+
+  const primaryLate = gapOf(current.cell.late);
+  const secondaryLate = gapOf(comparison.cell.late);
+  const difference = Math.abs(primaryLate - secondaryLate);
+  const larger = primaryLate >= secondaryLate ? compareSeries[0].name : compareSeries[1].name;
+  comparisonSummary.text(
+    `${compareSeries[0].name}: ${signed(primaryLate)} · ${compareSeries[1].name}: ${signed(secondaryLate)}. ` +
+    `${larger} has the larger end-of-century gap by ${difference.toFixed(1)}°C.`
+  );
+
+  const allValues = compareSeries.flatMap(d => d.values.map(v => v.value)).concat(0);
+  compareY.domain(d3.extent(allValues)).nice();
+
+  compareGrid.call(
+    d3.axisLeft(compareY).ticks(5).tickSize(-(COMPARE_W - CM.left - CM.right)).tickFormat("")
+  );
+  compareGrid.select(".domain").remove();
+  compareXAxis.call(d3.axisBottom(compareX).ticks(8).tickFormat(d3.format("d")).tickSizeOuter(0));
+  compareYAxis.call(d3.axisLeft(compareY).ticks(5).tickFormat(v => `${v}°`));
+  compareZero.attr("y1", compareY(0)).attr("y2", compareY(0));
+
+  comparePaths.selectAll("path")
+    .data(compareSeries, d => d.role)
+    .join("path")
+    .attr("class", "compare-line")
+    .attr("stroke", d => d.color)
+    .attr("d", d => compareLine(d.values));
+
+  const endPositions = spreadLabels(compareSeries.map(d => ({
+    ...d,
+    y: compareY(d.values[d.values.length - 1].value),
+  })), 16);
+
+  compareLabels.selectAll("text")
+    .data(endPositions, d => d.role)
+    .join("text")
+    .attr("class", "compare-end-label")
+    .attr("x", COMPARE_W - CM.right + 8)
+    .attr("y", d => d.y)
+    .attr("dy", "0.35em")
+    .attr("fill", d => d.color)
+    .text(d => d.name);
+
+  compareSvg.attr("aria-label",
+    `Line chart comparing the warming gap over time for ${compareSeries[0].name} and ${compareSeries[1].name}.`);
+}
+
+// ---------------------------------------------------------------------------
 // Preset picker + initial state
 // ---------------------------------------------------------------------------
 const presetSelect = d3.select("#preset");
+const comparisonSelect = d3.select("#compare-preset");
 
 // San Diego, then one entry per alert marker (each jumps to the square its marker points at).
 for (const alert of alerts) {
@@ -1136,6 +1331,12 @@ presetSelect.selectAll("option")
   .property("disabled", d => d.value === "")
   .text(d => d.name);
 
+comparisonSelect.selectAll("option")
+  .data([{ name: "No comparison", value: "" }, ...places.map((p, i) => ({ ...p, value: String(i) }))])
+  .join("option")
+  .attr("value", d => d.value)
+  .text(d => d.name);
+
 presetSelect.on("change", event => {
   const preset = places[+event.target.value];
   if (!preset) return;
@@ -1147,5 +1348,11 @@ presetSelect.on("change", event => {
   }
 });
 
+comparisonSelect.on("change", event => {
+  const preset = event.target.value === "" ? null : places[+event.target.value];
+  selectComparison(preset);
+});
+
 presetSelect.property("value", "0");
+comparisonSelect.property("value", "");
 selectPlace(places[0]);

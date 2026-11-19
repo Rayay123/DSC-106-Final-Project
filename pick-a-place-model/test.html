@@ -27,10 +27,16 @@
             Scroll over the map, or drag a box, to zoom in. Once zoomed, drag to move around
             (Shift+drag to box-zoom further); press Esc to zoom out.</p>
         </div>
-        <label class="picker">
-          <span>Jump to</span>
-          <select id="preset"></select>
-        </label>
+        <div class="picker-group">
+          <label class="picker">
+            <span>Jump to</span>
+            <select id="preset"></select>
+          </label>
+          <label class="picker">
+            <span>Compare with</span>
+            <select id="compare-preset"></select>
+          </label>
+        </div>
       </div>
       <!-- Map and line chart side by side. The divider between them can be dragged to
            resize the chart. -->
@@ -70,6 +76,15 @@
       </div>
 
       <aside id="science-note" class="science-note" aria-live="polite"></aside>
+
+      <section id="comparison-panel" class="comparison-panel" hidden>
+        <div class="comparison-head">
+          <h3>Compare the warming gap</h3>
+          <p id="comparison-summary"></p>
+        </div>
+        <div id="compare-chart" class="compare-chart"></div>
+        <p class="comparison-note">Each line shows SSP5-8.5 minus SSP1-2.6 using the ten-year mean.</p>
+      </section>
     </section>
 
     <p class="caveat">
