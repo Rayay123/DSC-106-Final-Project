@@ -967,8 +967,15 @@ let chartState = "docked";  // "docked" (beside the map) | "minimized" | "maximi
 
 // Width of the chart panel, changed by dragging the divider. The map takes the rest.
 const CHART_MIN_W = 260;
-const MAP_MIN_SHARE = 0.5;  // the map always keeps at least half the row (a narrower map
-                            // is also shorter, which would squash the chart beside it)
+const MAP_MIN_SHARE = 0.4;  // the map always keeps at least 40% of the row
+// The chart's height grows with its width (like resizing a picture), so dragging the
+// divider makes the chart bigger in both directions. The panel may then be taller than
+// the map; the map column stays at the top.
+// The ratio is high enough that the width-based height always wins over "fill the space beside
+// the map" (which shrinks as the map narrows), so every widening also makes the chart taller.
+const CHART_ASPECT = 0.88;  // chart height ÷ panel width
+const CHART_MIN_H = 180;
+const CHART_MAX_H = 600;
 let chartWidth = 360;
 // Narrow screens stack the chart below the map (see CSS), so there's nothing to resize.
 const stacked = window.matchMedia("(max-width: 820px)");
@@ -978,7 +985,9 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(Math.max(lo, hi), v));
 function setChartWidth(w) {
   const total = mapLayout.node().getBoundingClientRect().width;
   chartWidth = Math.round(clamp(w, CHART_MIN_W, total * (1 - MAP_MIN_SHARE)));
-  mapLayout.style("--chart-w", `${chartWidth}px`);
+  mapLayout
+    .style("--chart-w", `${chartWidth}px`)
+    .style("--chart-min-h", `${Math.round(clamp(chartWidth * CHART_ASPECT, CHART_MIN_H, CHART_MAX_H))}px`);
 }
 
 // Drag the divider: moving it left widens the chart, moving it right narrows it.

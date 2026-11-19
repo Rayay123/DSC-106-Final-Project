@@ -36,9 +36,23 @@
            resize the chart; the chart can also be minimized to a thin strip or expanded
            over the map. State is set by main.js. -->
       <div id="map-layout" class="map-layout">
-        <div class="map-wrap">
-          <div id="map" class="figure"></div>
-          <button type="button" id="zoom-reset" class="zoom-reset" hidden>Reset zoom (Esc)</button>
+        <!-- Map column: the map with its legend and display options underneath -->
+        <div class="map-column">
+          <div class="map-wrap">
+            <div id="map" class="figure"></div>
+            <button type="button" id="zoom-reset" class="zoom-reset" hidden>Reset zoom (Esc)</button>
+          </div>
+          <div id="map-legend"></div>
+          <div class="map-toggles">
+            <label class="fit-toggle">
+              <input type="checkbox" id="show-alerts" checked />
+              Show alert markers
+            </label>
+            <label class="fit-toggle">
+              <input type="checkbox" id="show-oceans" checked />
+              Show ocean names
+            </label>
+          </div>
         </div>
 
         <div id="chart-resize" class="chart-divider" role="separator" aria-orientation="vertical"
@@ -58,17 +72,6 @@
             <div id="chart-legend" class="chart-legend"></div>
           </div>
         </aside>
-      </div>
-      <div id="map-legend"></div>
-      <div class="map-toggles">
-        <label class="fit-toggle">
-          <input type="checkbox" id="show-alerts" checked />
-          Show alert markers
-        </label>
-        <label class="fit-toggle">
-          <input type="checkbox" id="show-oceans" checked />
-          Show ocean names
-        </label>
       </div>
     </section>
 
