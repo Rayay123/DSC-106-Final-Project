@@ -356,6 +356,34 @@ main {
   line-height: 1.45;
 }
 
+.science-note {
+  max-width: 54rem;
+  margin: 1rem auto 0;
+  padding: 0.8rem 1rem;
+  border-left: 4px solid var(--mid);
+  border-radius: 0 6px 6px 0;
+  background: #f5f1e7;
+}
+
+.science-note h3 {
+  margin: 0 0 0.25rem;
+  font-family: var(--serif);
+  font-size: 1rem;
+}
+
+.science-note p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.science-note a {
+  display: inline-block;
+  margin-top: 0.35rem;
+  color: var(--cool);
+  font-size: 0.78rem;
+}
+
 /* Beside the map: at least the width-based height, growing to fill a taller panel. */
 #chart { position: relative; flex: 1 0 auto; min-height: var(--chart-min-h, 220px); }
 /* Taken out of the flow so the drawn chart never props up its own box: the box's size is

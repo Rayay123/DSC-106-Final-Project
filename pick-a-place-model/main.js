@@ -17,6 +17,46 @@ const PRESETS = [
   { name: "San Diego", lat: 32.7, lon: -117.2 },
 ];
 
+// Short explanations for the marked patterns. These describe mechanisms that can
+// contribute to a regional pattern; they do not claim that one mechanism explains
+// every value in this single-model projection.
+const DRYLAND_NOTE = {
+  title: "Why can dry land warm more?",
+  text: "Land heats faster than the ocean, and dry ground has less water available for evaporative cooling. That leaves more energy to heat the surface and air. Higher evaporative demand and declining soil moisture can strengthen this effect in dry regions, so the high-emissions and low-emissions futures separate more.",
+  source: "IPCC: Deserts and semiarid regions",
+  url: "https://www.ipcc.ch/report/ar6/wg2/chapter/ccp3/",
+};
+
+const SCIENCE_NOTES = {
+  "Antarctica": {
+    title: "Why can polar warming become amplified?",
+    text: "Snow and ice reflect much of the Sun's energy. When they shrink, darker land or ocean absorbs more energy and adds to the warming, which is known as the ice-albedo feedback. Around Antarctica, Southern Ocean heat uptake and circulation also shape where and how quickly that amplification appears.",
+    source: "IPCC: Future global climate",
+    url: "https://www.ipcc.ch/report/ar6/wg1/chapter/chapter-4/",
+  },
+  "Canadian Arctic": {
+    title: "Why is the Arctic gap so large?",
+    text: "The Arctic has several reinforcing feedbacks. Losing reflective snow and sea ice allows more solar energy to be absorbed, while high-latitude atmospheric feedbacks make the extra heat less efficiently released to space. Together these processes help the Arctic warm faster than the global average.",
+    source: "IPCC: Future global climate",
+    url: "https://www.ipcc.ch/report/ar6/wg1/chapter/chapter-4/",
+  },
+  "Atlantic Ocean": {
+    title: "Why can the North Atlantic show a smaller gap?",
+    text: "The Atlantic overturning circulation carries heat northward. In climate-model experiments, a weaker circulation can reduce that heat transport and leave a relative cool patch in the North Atlantic, sometimes called the North Atlantic warming hole. Winds, mixing, and other ocean processes can contribute too, so this pattern should not be attributed to one cause alone.",
+    source: "NOAA GFDL: Atlantic circulation and heat transport",
+    url: "https://www.gfdl.noaa.gov/research_highlight/on-the-atlantic-extratropical-tropical-teleconnection-in-response-to-external-freshwater-forcing/",
+  },
+  "Australia": DRYLAND_NOTE,
+  "Saudi Arabia": DRYLAND_NOTE,
+  "NW Africa": DRYLAND_NOTE,
+  "South Africa": DRYLAND_NOTE,
+};
+
+const GENERAL_SCIENCE_NOTE = {
+  title: "What can shape the gap here?",
+  text: "A grid cell's warming gap can reflect several processes, including the contrast between land and ocean, soil moisture, snow or ice, and atmospheric or ocean circulation. This view uses one climate model, so it is better for exploring broad patterns than assigning one exact cause to every selected square. Choose one of the marked locations for an explanation of a well-known regional mechanism.",
+};
+
 // ---------------------------------------------------------------------------
 // Data
 // ---------------------------------------------------------------------------
@@ -153,14 +193,15 @@ function hideTooltip() {
 // ---------------------------------------------------------------------------
 let current = null;   // { name, lat, lon, cell, country }
 
-function selectPlace({ name, lat, lon }) {
+function selectPlace({ name, lat, lon, scienceKey = null }) {
   const cell = cellAt(lat, lon);
   if (!cell) return;
   const country = countryAt(lat, lon);
-  current = { name, lat, lon, cell, country, water: country ? null : waterAt(lat, lon) };
+  current = { name, lat, lon, cell, country, water: country ? null : waterAt(lat, lon), scienceKey };
   updateMapSelection();
   updateLegendMarker(gapOf(cell.late), true);  // purple tick on the color legend
   updateReadout();
+  updateScienceNote();
   updateChart(true);
 }
 
@@ -799,6 +840,17 @@ function updateReadout() {
   );
 }
 
+function updateScienceNote() {
+  const note = SCIENCE_NOTES[current.scienceKey] || GENERAL_SCIENCE_NOTE;
+  const source = note.url
+    ? `<a href="${note.url}" target="_blank" rel="noreferrer">${note.source}</a>`
+    : "";
+
+  d3.select("#science-note").html(
+    `<h3>${note.title}</h3><p>${note.text}</p>${source}`
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Line chart
 // ---------------------------------------------------------------------------
@@ -1068,7 +1120,12 @@ const presetSelect = d3.select("#preset");
 
 // San Diego, then one entry per alert marker (each jumps to the square its marker points at).
 for (const alert of alerts) {
-  alert.preset = { name: `${alert.label} (${alert.pick} gap)`, lat: alert.cell.lat, lon: alert.cell.lon };
+  alert.preset = {
+    name: `${alert.label} (${alert.pick} gap)`,
+    lat: alert.cell.lat,
+    lon: alert.cell.lon,
+    scienceKey: alert.label,
+  };
 }
 const places = [...PRESETS, ...alerts.map(a => a.preset)];
 
