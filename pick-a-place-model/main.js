@@ -197,6 +197,7 @@ function selectPlace({ name, lat, lon, scienceKey = null }) {
   const cell = cellAt(lat, lon);
   if (!cell) return;
   const country = countryAt(lat, lon);
+  scienceKey ??= scienceKeyForCell(cell);  // e.g. any square in the Atlantic warming hole
   current = { name, lat, lon, cell, country, water: country ? null : waterAt(lat, lon), scienceKey };
   updateMapSelection();
   updateLegendMarker(gapOf(cell.late), true);  // purple tick on the color legend
@@ -223,15 +224,22 @@ function cellBox(cell) {
   return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
 }
 
+// The map itself is drawn in 0..MAP_W × 0..MAP_H. The viewBox extends past that on every side
+// (negative origin) to make room for the latitude/longitude axes, so all the map and zoom math
+// keeps working in the same coordinates. layoutMapAxes() sets the viewBox.
 const mapSvg = d3.select("#map")
   .append("svg")
   .attr("viewBox", `0 0 ${MAP_W} ${MAP_H}`)
   .attr("role", "img")
   .attr("tabindex", -1)  // focusable by script (for Esc), but not in the tab order
-  .attr("aria-label", "World map of the end-of-century warming gap. Drag a box to zoom in; click a square to see that place's warming over time. Press Escape to zoom out.");
+  .attr("aria-label", "World map of the end-of-century warming gap, with latitude and longitude axes. Drag a box to zoom in; click a square to see that place's warming over time. Press Escape to zoom out.");
+
+// Zoomed content is clipped to the map frame so it never spills over the axes.
+mapSvg.append("clipPath").attr("id", "map-clip")
+  .append("rect").attr("width", MAP_W).attr("height", MAP_H);
 
 // Everything that zooms lives in this group.
-const zoomG = mapSvg.append("g");
+const zoomG = mapSvg.append("g").attr("clip-path", "url(#map-clip)").append("g");
 
 zoomG.append("path")
   .datum({ type: "Sphere" })
@@ -318,6 +326,11 @@ const selectedDot = zoomG.append("circle").attr("class", "selected-dot").attr("r
 //   side:      which side of the badge the label prefers ("right" by default); it still
 //              flips if it would run off the edge of the map
 //   pick:      "largest" (default) or "lowest" gap
+//   noteWhen:  which squares around the marker share its science note: starting from the
+//              marked square, every connected square whose gap passes this test (default:
+//              a gap of at least NOTE_GAP, i.e. the deep-red patch around the hotspot)
+//   noteInRegion: if true, the note's patch also stays inside `region`
+const NOTE_GAP = 3.9;
 
 // Canada's Arctic islands: every piece of Canada's outline except the mainland (the piece with
 // the most points) and the southern islands (Newfoundland, Vancouver Island, ...).
@@ -365,6 +378,9 @@ const ALERT_AREAS = [
         cell.lat >= 70 && cell.lat <= 80 && cell.lon >= -120 && cell.lon <= -80),
     region: cell => cell.lat > 60 && cell.lon > -125 && cell.lon < -60,
     side: "left",  // the right side is crowded by the Atlantic marker
+    // The +4 patch reaches across the whole Arctic (Russia, Alaska, ...), so keep the note to
+    // the area around the Canadian Arctic.
+    noteWhen: gap => gap >= 4, noteInRegion: true,
   },
   {
     // Water areas use `water` (a name from waterAt) instead of `countries`:
@@ -373,10 +389,31 @@ const ALERT_AREAS = [
     // North Atlantic "warming hole", where high emissions end up cooler than low.
     label: "Atlantic Ocean", water: "Atlantic Ocean", pick: "lowest",
     region: cell => cell.lat > -60 && cell.lat < 66 && cell.lon > -100 && cell.lon < 45,
+    noteWhen: gap => gap < 0,  // the whole blue patch (high emissions cooler than low)
   },
 ];
 
-const alerts = ALERT_AREAS.map(({ label, countries: names, water, test, region, side = "right", pick = "largest" }) => {
+// Every square connected to `start` (through up/down/left/right neighbors) that passes `keep`.
+function connectedCells(start, keep) {
+  const found = new Set([start]);
+  const queue = [start];
+  while (queue.length) {
+    const c = queue.pop();
+    for (const [dLat, dLon] of [[cellLat, 0], [-cellLat, 0], [0, cellLon], [0, -cellLon]]) {
+      const next = cellAt(c.lat + dLat, c.lon + dLon);
+      if (next && !found.has(next) && keep(next)) {
+        found.add(next);
+        queue.push(next);
+      }
+    }
+  }
+  return found;
+}
+
+const alerts = ALERT_AREAS.map(({
+  label, countries: names, water, test, region, side = "right", pick = "largest",
+  noteWhen = gap => gap >= NOTE_GAP, noteInRegion = false,
+}) => {
   const shapes = names ? countries.features.filter(f => names.includes(f.properties.name)) : [];
   const inArea =
     test ? test :
@@ -388,8 +425,22 @@ const alerts = ALERT_AREAS.map(({ label, countries: names, water, test, region, 
   const place = countryAt(cell.lat, cell.lon) || waterAt(cell.lat, cell.lon);
   // Near the top edge there's no room above the square, so draw the badge below it.
   const below = y < 60;
-  return { label, cell, x, y, side, pick, place, below };
+  // The patch of squares around the marker that share its science note.
+  const noteCells = connectedCells(cell, c => noteWhen(gapOf(c.late)) && (!noteInRegion || region(c)));
+  return { label, cell, x, y, side, pick, place, below, noteCells };
 });
+
+// Clicking anywhere in an alert's patch (not just on its marker) shows that alert's science
+// note. The patches don't overlap; if they ever did, the earlier alert in the list wins.
+const scienceKeyByCell = new Map();
+for (const alert of alerts) {
+  for (const cell of alert.noteCells) {
+    if (!scienceKeyByCell.has(cell)) scienceKeyByCell.set(cell, alert.label);
+  }
+}
+
+// The science note that goes with a square, for places picked on the map (not from a preset).
+const scienceKeyForCell = cell => scienceKeyByCell.get(cell) ?? null;
 
 // Marker geometry, drawn above the square (or mirrored below it when `below`).
 const flipY = (a, v) => (a.below ? -v : v);
@@ -494,7 +545,90 @@ function applyZoom(t) {
   alertMarkers.attr("transform", a => `translate(${a.x}, ${a.y}) scale(${1 / t.k})`);
   oceanLabels.attr("transform", o => `translate(${o.x}, ${o.y}) scale(${1 / t.k})`);
   placeAlertLabels(t);
+  updateMapAxes(t);
 }
+
+// ---------------------------------------------------------------------------
+// Latitude / longitude axes around the map
+// ---------------------------------------------------------------------------
+// The map SVG scales with its box, which would shrink the axis text along with the map. So
+// the axes are drawn in screen pixels: the axis layer is scaled by 1/s (s = screen pixels per
+// map unit) and the margins are added to the viewBox in map units (pixels / s).
+const AXIS_MARGIN = { top: 8, right: 22, bottom: 38, left: 52 };  // screen pixels
+let mapPxScale = 1;  // s: screen pixels per map unit
+
+const lonScale = d3.scaleLinear().domain([-180, 180])
+  .range([projection([-180, 0])[0], projection([180, 0])[0]]);
+const latScale = d3.scaleLinear().domain([90, -90])
+  .range([projection([0, 90])[1], projection([0, -90])[1]]);
+
+const mapAxisLayer = mapSvg.append("g").attr("class", "map-axes").attr("aria-hidden", "true");
+const lonAxisG = mapAxisLayer.append("g").attr("class", "axis map-axis");
+const latAxisG = mapAxisLayer.append("g").attr("class", "axis map-axis");
+const lonTitle = mapAxisLayer.append("text").attr("class", "axis-title").attr("text-anchor", "middle")
+  .text("Longitude");
+const latTitle = mapAxisLayer.append("text").attr("class", "axis-title").attr("text-anchor", "middle")
+  .text("Latitude");
+
+const lonLabel = d => (d === 0 || Math.abs(d) === 180 ? `${Math.abs(d)}°` : `${Math.abs(d)}°${d < 0 ? "W" : "E"}`);
+const latLabel = d => (d === 0 ? "0°" : `${Math.abs(d)}°${d < 0 ? "S" : "N"}`);
+
+// Ticks at "round" degree steps (…, 10, 15, 30, 60, 90) instead of d3's 1-2-5 steps, so the
+// whole world reads 180°W, 120°W, 60°W, 0°, … rather than 150°W, 100°W, …
+const DEGREE_STEPS = [0.5, 1, 2, 2.5, 5, 10, 15, 20, 30, 60, 90];
+function degreeTicks([a, b], maxTicks) {
+  const [lo, hi] = a < b ? [a, b] : [b, a];
+  const step = DEGREE_STEPS.find(s => (hi - lo) / s <= maxTicks) ?? 90;
+  const ticks = [];
+  for (let v = Math.ceil(lo / step - 1e-9) * step; v <= hi + 1e-9; v += step) ticks.push(+v.toFixed(2));
+  return ticks;
+}
+
+function updateMapAxes(t = shownZoom) {
+  const s = mapPxScale;
+  const W = MAP_W * s, H = MAP_H * s;
+  // Visible part of each scale at this zoom, stretched over the axis in screen pixels.
+  const lon = t.rescaleX(lonScale).range(lonScale.range().map(v => v * s));
+  const lat = t.rescaleY(latScale).range(latScale.range().map(v => v * s));
+  const visibleLon = [lon.invert(0), lon.invert(W)].map(v => Math.max(-180, Math.min(180, v)));
+  const visibleLat = [lat.invert(0), lat.invert(H)].map(v => Math.max(-90, Math.min(90, v)));
+
+  lonAxisG.attr("transform", `translate(0, ${H})`)
+    .call(d3.axisBottom(lon).tickValues(degreeTicks(visibleLon, Math.max(3, W / 75)))
+      .tickFormat(lonLabel).tickSizeOuter(0));
+  latAxisG
+    .call(d3.axisLeft(lat).tickValues(degreeTicks(visibleLat, Math.max(3, H / 45)))
+      .tickFormat(latLabel).tickSizeOuter(0));
+  // The axis line spans the map frame, not the (zoomed) world outline.
+  lonAxisG.select(".domain").attr("d", `M0,0H${W}`);
+  latAxisG.select(".domain").attr("d", `M0,0V${H}`);
+}
+
+// Fit the axes to the map's current on-screen width (layout changes, window resize).
+function layoutMapAxes() {
+  const width = mapSvg.node().getBoundingClientRect().width;
+  if (!width) return;
+  const M = AXIS_MARGIN;
+  const s = Math.max(0.05, (width - M.left - M.right) / MAP_W);
+  mapPxScale = s;
+  mapSvg.attr("viewBox", [
+    -M.left / s, -M.top / s,
+    MAP_W + (M.left + M.right) / s, MAP_H + (M.top + M.bottom) / s,
+  ].join(" "));
+  mapAxisLayer.attr("transform", `scale(${1 / s})`);
+  lonTitle.attr("x", (MAP_W * s) / 2).attr("y", MAP_H * s + M.bottom - 4);
+  latTitle.attr("transform", `translate(${-M.left + 12}, ${(MAP_H * s) / 2}) rotate(-90)`);
+  updateMapAxes();
+}
+
+let mapAxesWidth = 0;
+new ResizeObserver(([entry]) => {
+  // Only width matters (the height follows from the viewBox), which also avoids a resize loop.
+  if (Math.round(entry.contentRect.width) === mapAxesWidth) return;
+  mapAxesWidth = Math.round(entry.contentRect.width);
+  layoutMapAxes();
+}).observe(document.getElementById("map"));
+layoutMapAxes();
 
 // Record the zoom we're heading to and update the zoom-dependent UI (cursor, reset button).
 function setTargetZoom(t) {
@@ -502,6 +636,7 @@ function setTargetZoom(t) {
   const zoomed = t.k > 1;
   mapSvg.classed("is-zoomed", zoomed);
   resetZoomButton.property("hidden", !zoomed);
+  if (!zoomed) setFocused(false);  // back to the whole world: give the map its room back
 }
 
 function zoomTo(t) {
@@ -520,7 +655,10 @@ function pointerScreen(event) {
 }
 
 function pointerLatLon(event) {
-  const [mx, my] = shownZoom.invert(d3.pointer(event, mapSvg.node()));
+  const [px, py] = d3.pointer(event, mapSvg.node());
+  // Over the axes (outside the map frame): no place there, even if the zoomed world extends past it.
+  if (px < 0 || px > MAP_W || py < 0 || py > MAP_H) return null;
+  const [mx, my] = shownZoom.invert([px, py]);
   const lonLat = projection.invert([mx, my]);
   if (!lonLat || Math.abs(lonLat[0]) > 180 || Math.abs(lonLat[1]) > 90) return null;
   return { lon: lonLat[0], lat: lonLat[1] };
@@ -603,11 +741,12 @@ function handleMapClick(event, alert) {
     presetSelect.property("value", "");
     selectPlace({ name: null, ...point });
   }
-  // First click on an unzoomed map also zooms in on that spot.
+  // First click on an unzoomed map also zooms in on that spot. Later clicks keep the zoom.
   if (targetZoom.k === 1) {
     const [mx, my] = projection([point.lon, point.lat]);
     zoomTo(centeredTransform(CLICK_ZOOM, mx, my));
   }
+  setFocused(true);  // smaller map, bigger chart
 }
 
 function endDrag() {
@@ -1139,17 +1278,53 @@ const CHART_ASPECT = 0.88;  // chart height ÷ panel width
 const CHART_MIN_H = 180;
 const CHART_MAX_H = 300;
 let chartWidth = 360;
+let chartMaxH = CHART_MAX_H;  // height cap; raised while a place is in focus (see setFocused)
 // Narrow screens stack the chart below the map (see CSS), so there's nothing to resize.
 const stacked = window.matchMedia("(max-width: 820px)");
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(Math.max(lo, hi), v));
 
-function setChartWidth(w) {
+function setChartWidth(w, maxH = chartMaxH) {
   const total = mapLayout.node().getBoundingClientRect().width;
   chartWidth = Math.round(clamp(w, CHART_MIN_W, total * (1 - MAP_MIN_SHARE)));
+  chartMaxH = maxH;
   mapLayout
     .style("--chart-w", `${chartWidth}px`)
-    .style("--chart-min-h", `${Math.round(clamp(chartWidth * CHART_ASPECT, CHART_MIN_H, CHART_MAX_H))}px`);
+    .style("--chart-min-h", `${Math.round(clamp(chartWidth * CHART_ASPECT, CHART_MIN_H, chartMaxH))}px`);
+}
+
+// Focus layout: once a place is selected (and the map zooms in), the map shrinks and the
+// chart grows. It stays that way while the map is zoomed in, so clicking other places keeps
+// the big chart; zooming back out to the whole world (reset button, Esc, scroll) restores the
+// big map. The divider still works in either layout, and each layout remembers its own width.
+const FOCUS_CHART_SHARE = 0.55;   // chart's share of the row while focused
+const CHART_FOCUS_MAX_H = 420;    // let the chart get taller too, not just wider
+const LAYOUT_MS = 750;            // same as the zoom animation, so both move together
+let focused = false;
+let normalChartWidth = chartWidth;  // chart width to return to when focus ends
+let focusChartWidth = null;         // chart width while focused (null: use the default share)
+
+function animateChartLayout(w, maxH) {
+  const w0 = chartWidth, h0 = chartMaxH;
+  const step = u => setChartWidth(w0 + (w - w0) * u, h0 + (maxH - h0) * u);
+  mapLayout.interrupt("layout");
+  if (reducedMotion.matches) return step(1);
+  mapLayout.transition("layout").duration(LAYOUT_MS).ease(d3.easeCubicInOut)
+    .tween("layout", () => step);
+}
+
+function setFocused(on) {
+  if (on === focused) return;
+  focused = on;
+  mapLayout.classed("is-focused", on);
+  if (on) {
+    normalChartWidth = chartWidth;
+    const total = mapLayout.node().getBoundingClientRect().width;
+    animateChartLayout(focusChartWidth ?? Math.max(chartWidth, total * FOCUS_CHART_SHARE), CHART_FOCUS_MAX_H);
+  } else {
+    focusChartWidth = chartWidth;
+    animateChartLayout(normalChartWidth, CHART_MAX_H);
+  }
 }
 
 // Drag the divider: moving it left widens the chart, moving it right narrows it.
@@ -1159,6 +1334,7 @@ chartDivider
   .on("pointerdown", event => {
     if (event.button !== 0 || stacked.matches) return;
     event.preventDefault();  // no text selection while dragging
+    mapLayout.interrupt("layout");  // the drag takes over from a running focus animation
     divDrag = { x: event.clientX, startW: chartWidth };
     event.currentTarget.setPointerCapture(event.pointerId);
     mapLayout.classed("is-resizing", true);
@@ -1216,11 +1392,11 @@ presetSelect.on("change", event => {
   const preset = places[+event.target.value];
   if (!preset) return;
   selectPlace(preset);
-  // If the map is zoomed in, pan (at the same zoom) so the preset is in view.
-  if (targetZoom.k > 1) {
-    const [mx, my] = projection([preset.lon, preset.lat]);
-    zoomTo(centeredTransform(targetZoom.k, mx, my));
-  }
+  // Like clicking the map: zoom in on the preset (or, if already zoomed in, pan to it at the
+  // same zoom) and switch to the focus layout with the big chart.
+  const [mx, my] = projection([preset.lon, preset.lat]);
+  zoomTo(centeredTransform(targetZoom.k > 1 ? targetZoom.k : CLICK_ZOOM, mx, my));
+  setFocused(true);
 });
 
 presetSelect.property("value", "0");

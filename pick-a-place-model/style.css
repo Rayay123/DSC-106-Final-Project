@@ -144,6 +144,9 @@ main {
 
 /* The heatmap is one small image (a block per square), stretched over the map.
    Keep its square edges sharp instead of blurring them when zoomed in. */
+/* Latitude / longitude axes around the map (drawn in screen pixels; see layoutMapAxes) */
+.map-axes { pointer-events: none; }
+
 .heatmap {
   image-rendering: crisp-edges;
   image-rendering: pixelated;
