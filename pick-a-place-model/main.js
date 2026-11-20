@@ -330,6 +330,7 @@ const selectedDot = zoomG.append("circle").attr("class", "selected-dot").attr("r
 //              marked square, every connected square whose gap passes this test (default:
 //              a gap of at least NOTE_GAP, i.e. the deep-red patch around the hotspot)
 //   noteInRegion: if true, the note's patch also stays inside `region`
+//   noteAlso:  extra squares ([lat, lon] of any point inside them) added to the note's patch
 const NOTE_GAP = 3.9;
 
 // Canada's Arctic islands: every piece of Canada's outline except the mainland (the piece with
@@ -365,6 +366,9 @@ const ALERT_AREAS = [
     label: "South Africa", countries: ["South Africa"],
     region: cell => cell.lat < -20 && cell.lat > -36 && cell.lon > 15 && cell.lon < 34,
     side: "left",  // over the South Atlantic, clear of the "Indian Ocean" name
+    // Two Botswana squares (+3.0 and +3.3) sit inside the patch, surrounded by squares above
+    // the threshold; count them too so the patch has no hole in it.
+    noteAlso: [[-21, 23.75], [-21, 26.25]],
   },
   {
     // The Canadian Arctic Archipelago: Canada's Arctic islands plus the channels between them
@@ -412,7 +416,7 @@ function connectedCells(start, keep) {
 
 const alerts = ALERT_AREAS.map(({
   label, countries: names, water, test, region, side = "right", pick = "largest",
-  noteWhen = gap => gap >= NOTE_GAP, noteInRegion = false,
+  noteWhen = gap => gap >= NOTE_GAP, noteInRegion = false, noteAlso = [],
 }) => {
   const shapes = names ? countries.features.filter(f => names.includes(f.properties.name)) : [];
   const inArea =
@@ -427,6 +431,10 @@ const alerts = ALERT_AREAS.map(({
   const below = y < 60;
   // The patch of squares around the marker that share its science note.
   const noteCells = connectedCells(cell, c => noteWhen(gapOf(c.late)) && (!noteInRegion || region(c)));
+  for (const [lat, lon] of noteAlso) {
+    const extra = cellAt(lat, lon);
+    if (extra) noteCells.add(extra);
+  }
   return { label, cell, x, y, side, pick, place, below, noteCells };
 });
 
